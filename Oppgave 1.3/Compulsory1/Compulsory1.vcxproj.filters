@@ -1483,6 +1483,8 @@
     <None Include="x64\Release\Spline-kurve.iobj" />
     <None Include="x64\Release\Spline-kurve.ipdb" />
     <None Include="x64\Release\vc143.pdb" />
+    <None Include="phong.vert" />
+    <None Include="phong.frag" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="dependencies\lib\glfw3.lib" />

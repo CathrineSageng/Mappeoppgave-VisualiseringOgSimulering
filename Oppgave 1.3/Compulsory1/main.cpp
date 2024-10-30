@@ -34,7 +34,6 @@ const unsigned int SCR_HEIGHT = 1200;
 // Camera settings
 //This is the starting position of the of the camera 
 Camera camera(glm::vec3(2.13f, 11.7f, 0.2f));
-//Camera camera(glm::vec3(0.0f, 0.0f, 0.0f));
 
 
 //Keeps track of the last position of the mouse cursor 
@@ -54,6 +53,15 @@ struct Triangle {
     int a, b, c;
 };
 
+struct VertexData {
+    glm::vec3 position;
+    glm::vec3 color;
+};
+
+struct VertexData1 {
+    glm::vec3 position;
+    glm::vec3 normal;
+};
 vector<glm::vec3> superTrianglePoints;
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -61,21 +69,27 @@ void processInput(GLFWwindow* window);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void convertLazFilesToTextFiles(const string& inputFilename, const string& outputFilename);
-//vector<glm::vec3> loadPointsFromTextFile(const string& filename);
 vector<glm::vec3> loadPointsFromTextFile(const string& filename, int maxPoints);
 std::vector<glm::vec3> loadPointsFromMultipleTextFiles(const std::vector<std::string>& textFiles);
 bool inCircumcircle(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c, const glm::vec3& p);
 void addSuperTriangle(vector<glm::vec3>& points);
 vector<glm::ivec3> delaunayTriangulation(vector<glm::vec3>& points);
-glm::vec3 interpolateHeight(const glm::vec3& p1, const glm::vec3& p2, const glm::vec3& p3, const glm::vec2& baryCoords);
+vector<glm::vec3> calculateNormals(const vector<glm::vec3>& points, const vector<glm::ivec3>& triangles);
+
 
 string vfs = ShaderLoader::LoadShaderFromFile("vs.vs");
 string fs = ShaderLoader::LoadShaderFromFile("fs.fs");
+string vfsp = ShaderLoader::LoadShaderFromFile("phong.vert");
+string fsp = ShaderLoader::LoadShaderFromFile("phong.frag");
 
 int main()
 {
     std::cout << "vfs " << vfs.c_str() << std::endl;
     std::cout << "fs " << fs.c_str() << std::endl;
+
+    std::cout << "vfsp " << vfs.c_str() << std::endl;
+    std::cout << "fsp " << fs.c_str() << std::endl;
+
 
     // glfw: initialize and configure
     // ------------------------------
@@ -133,73 +147,101 @@ int main()
 
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(glm::vec3), points.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(glm::vec3), points.data(), GL_DYNAMIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
     glEnableVertexAttribArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
-    // Delaunay-triangulering for trekantene
-    //int gridWidth = static_cast<int>(sqrt(points.size()));
-
-    //vector<glm::vec3> testPoints = {
-    // {0.0f, 0.0f, 0.0f},  // Punkt 0
-    // {1.0f, 0.0f, 0.0f},  // Punkt 1
-    // {0.5f, 1.0f, 0.0f},  // Punkt 2
-    // {1.5f, 1.0f, 0.0f},  // Punkt 3
-    // {0.0f, 2.0f, 0.0f},  // Punkt 4
-    // {1.0f, 2.0f, 0.0f},  // Punkt 5
-    // {-1.0f, 1.0f, 0.0f}, // Punkt 6
-    // {2.0f, 0.0f, 0.0f},  // Punkt 7
-    // {2.0f, 2.0f, 0.0f},  // Punkt 8
-    // {-1.5f, 0.5f, 0.0f}, // Punkt 9
-    // {1.0f, -1.0f, 0.0f}, // Punkt 10
-    // {1.5f, -1.5f, 0.0f}, // Punkt 11
-    // {0.5f, -1.0f, 0.0f}, // Punkt 12
-    // {-1.0f, -1.0f, 0.0f}, // Punkt 13
-    // {2.5f, 1.5f, 0.0f},   // Punkt 14
-    // {-0.5f, -0.5f, 0.0f}, // Punkt 15
-    // {3.0f, 0.0f, 0.0f},   // Punkt 16
-    // {3.0f, 3.0f, 0.0f},   // Punkt 17
-    // {-2.0f, 2.0f, 0.0f},  // Punkt 18
-    // {-2.0f, -1.5f, 0.0f}  // Punkt 19
-    //};
-
     vector<glm::ivec3> triangles = delaunayTriangulation(points);
 
-    // Setter opp trekantenes VAO, VBO og EBO
+    // Beregn normalene og sett opp vertexdata med posisjoner og normaler
+    vector<VertexData1> vertexData1;
+    vector<glm::vec3> normals1 = calculateNormals(points, triangles);
+
+    for (size_t i = 0; i < points.size(); ++i) {
+        VertexData1 data;
+        data.position = points[i];
+        data.normal = normals1[i];
+        vertexData1.push_back(data);
+    }
+
     GLuint VAOTri, VBOTri, EBOTri;
     glGenVertexArrays(1, &VAOTri);
     glGenBuffers(1, &VBOTri);
     glGenBuffers(1, &EBOTri);
 
     glBindVertexArray(VAOTri);
-
     glBindBuffer(GL_ARRAY_BUFFER, VBOTri);
-    glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(glm::vec3), points.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertexData1.size() * sizeof(VertexData), vertexData1.data(), GL_DYNAMIC_DRAW);
 
+    // Oppsett av posisjonsattributtet
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)offsetof(VertexData, position));
+    glEnableVertexAttribArray(0);
+
+    // Oppsett av normalattributtet
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData1), (void*)offsetof(VertexData1, normal));
+    glEnableVertexAttribArray(1);
+
+    // Last opp indeksdataene for trekantene
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBOTri);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, triangles.size() * sizeof(glm::ivec3), triangles.data(), GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
-    glEnableVertexAttribArray(0);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, triangles.size() * sizeof(glm::ivec3), triangles.data(), GL_DYNAMIC_DRAW);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
-    //Supertrekant
-    GLuint superVAO, superVBO;
-    glGenVertexArrays(1, &superVAO);
-    glGenBuffers(1, &superVBO);
 
-    glBindVertexArray(superVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, superVBO);
-    glBufferData(GL_ARRAY_BUFFER, superTrianglePoints.size() * sizeof(glm::vec3), superTrianglePoints.data(), GL_STATIC_DRAW);
+    // Variabel for å lagre alle punktene for normal-linjesegmentene
+    vector<VertexData> normalVertices;
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
+    float normalLength = 0.0001f; // Lengden på normal-linjesegmentene
+    glm::vec3 pinkColor(1.0f, 0.0f, 0.5f); // Rosa farge for normalene
+
+    // Beregn normaler
+    vector<glm::vec3> normals = calculateNormals(points, triangles);
+
+    // Legg til linjesegmentene for hver normal med farge
+    for (size_t i = 0; i < points.size(); ++i) {
+        glm::vec3 start = points[i];                     // Startpunkt for normalen
+        glm::vec3 end = start + normals[i] * normalLength; // Sluttpunkt for normalen
+
+        // Legg til start- og sluttpunkt til normalVertices med rosa farge
+        normalVertices.push_back({ start, pinkColor });
+        normalVertices.push_back({ end, pinkColor });
+    }
+
+    // Opprett buffer for normalvektorene
+    GLuint VAONormals, VBONormals;
+    glGenVertexArrays(1, &VAONormals);
+    glGenBuffers(1, &VBONormals);
+
+    glBindVertexArray(VAONormals);
+    glBindBuffer(GL_ARRAY_BUFFER, VBONormals);
+    glBufferData(GL_ARRAY_BUFFER, normalVertices.size() * sizeof(VertexData), normalVertices.data(), GL_DYNAMIC_DRAW);
+
+    // Sett opp posisjonsattributtet
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)0);
     glEnableVertexAttribArray(0);
+
+    // Sett opp fargeattributtet
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)offsetof(VertexData, color));
+    glEnableVertexAttribArray(1);
+
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
+
+    // Lys- og materialegenskaper
+    glm::vec3 lightPos(10.0f, 10.0f, 10.0f);
+    glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
+    glm::vec3 objectColor(0.0f, 1.0f, 0.0f); // Sett fargen til grønn
+
+    // Bruk Phong-shader
+    Shader phongShader("phong.vert", "phong.frag");
+    phongShader.use();
+    phongShader.setVec3("lightPos", lightPos);
+    phongShader.setVec3("viewPos", camera.Position);  // Passerer kameraets posisjon
+    phongShader.setVec3("lightColor", lightColor);
+    phongShader.setVec3("objectColor", objectColor);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -225,32 +267,43 @@ int main()
         ourShader.setMat4("model", model);
 
         //Rendering the points 
-    /*    glBindVertexArray(VAO);
+        glBindVertexArray(VAO);
         glPointSize(3.0f); 
         glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(points.size()));
-        glBindVertexArray(0);*/
+        glBindVertexArray(0);
+
+        // Rendering av normalvektorer som linjesegmenter
+        glBindVertexArray(VAONormals);
+        glLineWidth(2.0f); // Tykkelsen på normal-linjene
+        glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(normalVertices.size()));
+        glBindVertexArray(0);
+
+        phongShader.use();
+        phongShader.setMat4("projection", projection);
+        phongShader.setMat4("view", view);
+        phongShader.setMat4("model", model);
+        phongShader.setVec3("viewPos", camera.Position);
 
         // Rendering av trianguleringen
         glBindVertexArray(VAOTri);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(triangles.size() * 3), GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
-        //glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); // Sett til fylt modus
-        glBindVertexArray(superVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 3); // Bruk GL_TRIANGLES for å tegne fylt trekant
-        glBindVertexArray(0);
+     
 
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------
-    glDeleteVertexArrays(1, &superVAO);
-    glDeleteBuffers(1, &superVBO);
     glDeleteVertexArrays(1, &VAOTri);
     glDeleteBuffers(1, &VBOTri);
     glDeleteBuffers(1, &EBOTri);
+    glDeleteVertexArrays(1, &VAONormals);
+    glDeleteBuffers(1, &VBONormals);
+    glDeleteVertexArrays(1, &VAO);
+    glDeleteBuffers(1, &VBO);
     glfwTerminate();
     return 0;
 }
@@ -283,8 +336,8 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 {
-    float xpos = static_cast<float>(xposIn);
-    float ypos = static_cast<float>(yposIn);
+    double xpos = static_cast<float>(xposIn);
+    double ypos = static_cast<float>(yposIn);
 
     if (firstMouse)
     {
@@ -293,8 +346,8 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
         firstMouse = false;
     }
 
-    float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos;
+    double xoffset = xpos - lastX;
+    double yoffset = lastY - ypos;
 
     lastX = xpos;
     lastY = ypos;
@@ -366,55 +419,6 @@ void convertLazFilesToTextFiles(const string& inputFilename, const string& outpu
     cout << "Conversion completed for: " << inputFilename << endl;
 }
 
-////Function for reading the coordinates from the text file to rendering
-//vector<glm::vec3> loadPointsFromTextFile(const string& filename)
-//{
-//    //ifstream opens the file for reading
-//    ifstream inFile(filename);
-//    vector<glm::vec3> points;
-//
-//    //Checks if the opening of the file was succsessful. 
-//    if (!inFile.is_open())
-//    {
-//        cerr << "Could not open the file " << filename << endl;
-//        return points;
-//    }
-//
-//    //Reads number of points of the text file (the first line of the text file)
-//    size_t numPoints;
-//    inFile >> numPoints;
-//    cout << "Number of points in the file: " << numPoints << endl;
-//
-//    //The variables are used to scale and translate the data points (coordinates) so we can see them in the camera view
-//    float x, y, z;
-//
-//    const float xScale = 0.0001f;   
-//    const float yScale = 0.0001f;  
-//    const float zScale = 0.0001f*5;
-//    //Moves the points near origo
-//    const glm::vec3 translationOffset(-59.0f, -663.0f, 0.0f); 
-//
-//    //The loop reads the data points from the text file. The data points are scaled and translated, and then beeing stored in a vector
-//    size_t pointCounter = 0;
-//    while (inFile >> x >> y >> z)
-//    {
-//        glm::vec3 point(x * xScale, y * yScale, z * zScale); // Forsterker z for bedre synlighet
-//        point += translationOffset; // Flytter punktene etter skalering
-//        points.push_back(point);
-//
-//        // Writes out the 10 coordinates from the text file to see that the translation is ok
-//        if (pointCounter < 10)
-//        {
-//            cout << "Point " << pointCounter + 1 << ": "
-//                << point.x << ", " << point.y << ", " << point.z <<endl;
-//        }
-//        pointCounter++;
-//    }
-//    //Closes the file and the function returns the points vector
-//    inFile.close();
-//    cout << "Total number of loaded points: " << points.size() <<endl;
-//    return points;
-//}
 
 // Endre `loadPointsFromTextFile` til å begrense antall punkter
 vector<glm::vec3> loadPointsFromTextFile(const string& filename, int maxPoints) {
@@ -432,12 +436,12 @@ vector<glm::vec3> loadPointsFromTextFile(const string& filename, int maxPoints) 
 
     // Skalerings- og offset-variabler
     float x, y, z;
-    const float xScale = 0.0001f;
-    const float yScale = 0.0001f;
-    const float zScale = 0.0005f;
+    const double xScale = 0.0001f;
+    const double yScale = 0.0001f;
+    const double zScale = 0.0001f;
     const glm::vec3 translationOffset(-59.0f, -663.0f, 0.0f);
 
-    size_t pointCounter = 0;
+    size_t pointCounter = 0;  
     while (inFile >> x >> y >> z && pointCounter < maxPoints) {
         glm::vec3 point(x * xScale, y * yScale, z * zScale);
         point += translationOffset;
@@ -469,7 +473,7 @@ vector<glm::vec3> loadPointsFromMultipleTextFiles(const vector<string>& textFile
 
     for (const auto& textFile : textFiles)
     {
-        vector<glm::vec3> points = loadPointsFromTextFile(textFile, 1000);
+        vector<glm::vec3> points = loadPointsFromTextFile(textFile, 100000);
         allPoints.insert(allPoints.end(), points.begin(), points.end());
     }
 
@@ -477,14 +481,14 @@ vector<glm::vec3> loadPointsFromMultipleTextFiles(const vector<string>& textFile
 }
 
 bool inCircumcircle(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c, const glm::vec3& p) {
-    float ax = a.x - p.x;
-    float ay = a.y - p.y;
-    float bx = b.x - p.x;
-    float by = b.y - p.y;
-    float cx = c.x - p.x;
-    float cy = c.y - p.y;
+    double ax = a.x - p.x;
+    double ay = a.y - p.y;
+    double bx = b.x - p.x;
+    double by = b.y - p.y;
+    double cx = c.x - p.x;
+    double cy = c.y - p.y;
 
-    float det = (ax * ax + ay * ay) * (bx * cy - by * cx) -
+    double det = (ax * ax + ay * ay) * (bx * cy - by * cx) -
         (bx * bx + by * by) * (ax * cy - ay * cx) +
         (cx * cx + cy * cy) * (ax * by - ay * bx);
 
@@ -492,28 +496,12 @@ bool inCircumcircle(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c, 
 }
 
 // Opprett en supertrekant som dekker alle punktene
-void addSuperTriangle(vector<glm::vec3>& points) 
-{
+void addSuperTriangle(vector<glm::vec3>& points) {
     float maxCoordinate = 10000.0f;
-    glm::vec3 p1(-maxCoordinate, -maxCoordinate, 0.0f);
-    glm::vec3 p2(maxCoordinate, -maxCoordinate, 0.0f);
-    glm::vec3 p3(0.0f, maxCoordinate, 0.0f);
-
-    // Legg til supertrekantens hjørner til punktlisten og superTrianglePoints
-    points.push_back(p1);
-    points.push_back(p2);
-    points.push_back(p3);
-
-    superTrianglePoints.push_back(p1);
-    superTrianglePoints.push_back(p2);
-    superTrianglePoints.push_back(p3);
-
-    // Skriv ut koordinatene til supertrekantens hjørner
-    std::cout << "Super Triangle Point 1: (" << p1.x << ", " << p1.y << ", " << p1.z << ")" << std::endl;
-    std::cout << "Super Triangle Point 2: (" << p2.x << ", " << p2.y << ", " << p2.z << ")" << std::endl;
-    std::cout << "Super Triangle Point 3: (" << p3.x << ", " << p3.y << ", " << p3.z << ")" << std::endl;
+    points.push_back(glm::vec3(-maxCoordinate, -maxCoordinate, 0.0f));
+    points.push_back(glm::vec3(maxCoordinate, -maxCoordinate, 0.0f));
+    points.push_back(glm::vec3(0.0f, maxCoordinate, 0.0f));
 }
-
 
 // Delaunay-triangulering med inkrementell tilnærming
 vector<glm::ivec3> delaunayTriangulation(vector<glm::vec3>& points) {
@@ -576,6 +564,33 @@ vector<glm::ivec3> delaunayTriangulation(vector<glm::vec3>& points) {
     return triangles;
 }
 
+vector<glm::vec3> calculateNormals(const vector<glm::vec3>& points, const vector<glm::ivec3>& triangles) {
+    vector<glm::vec3> normals(points.size(), glm::vec3(0.0f)); // Initierer normalene til (0, 0, 0) for hvert punkt
+
+    for (const auto& tri : triangles) {
+        // Få punktkoordinatene for trekantens hjørner
+        glm::vec3 p0 = points[tri.x];
+        glm::vec3 p1 = points[tri.y];
+        glm::vec3 p2 = points[tri.z];
+
+        // Beregn trekantens normal ved kryssprodukt
+        glm::vec3 edge1 = p1 - p0;
+        glm::vec3 edge2 = p2 - p0;
+        glm::vec3 triangleNormal = glm::normalize(glm::cross(edge1, edge2));
+
+        // Legg til trekantens normal til hvert av trekantens hjørner
+        normals[tri.x] += triangleNormal;
+        normals[tri.y] += triangleNormal;
+        normals[tri.z] += triangleNormal;
+    }
+
+    // Normaliser hver normalvektor
+    for (auto& normal : normals) {
+        normal = glm::normalize(normal);
+    }
+
+    return normals;
+}
 
 
 

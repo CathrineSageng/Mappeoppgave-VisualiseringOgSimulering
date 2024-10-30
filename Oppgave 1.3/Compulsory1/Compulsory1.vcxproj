@@ -723,6 +723,8 @@
     <None Include="dependencies\include\proj\vcpkg.spdx.json" />
     <None Include="dependencies\include\proj\world" />
     <None Include="fs.fs" />
+    <None Include="phong.frag" />
+    <None Include="phong.vert" />
     <None Include="vs.vs" />
     <None Include="x64\Release\Oppgave_1.exe.recipe" />
     <None Include="x64\Release\Oppgave_1.iobj" />
