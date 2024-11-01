@@ -47,17 +47,27 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 float BSplineBasis(int i, int k, float t, const vector<float>& knots);
 glm::vec3 BSplineSurface(float u, float v, const vector<glm::vec3>& controlPoints, int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV);
-glm::vec3 BSplinePartialDerivative(float u, float v, const vector<glm::vec3>& controlPoints, int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV, bool withRespectToU);
-vector<glm::vec3> CalculateSurfaceNormals(const vector<glm::vec3>& surfacePoints, int pointsOnTheSurface, const vector<glm::vec3>& controlPoints, int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV);
+glm::vec3 BSplinePartialDerivative(float u, float v, const vector<glm::vec3>& controlPoints, int widthU,
+int widthV, const vector<float>& knotU, const vector<float>& knotV, bool withRespectToU);
+vector<glm::vec3> CalculateSurfaceNormals(const vector<glm::vec3>& surfacePoints, int pointsOnTheSurface, 
+const vector<glm::vec3>& controlPoints, int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV);
 
 
 std::string vfs = ShaderLoader::LoadShaderFromFile("vs.vs");
 std::string fs = ShaderLoader::LoadShaderFromFile("fs.fs");
 
+string vfsp = ShaderLoader::LoadShaderFromFile("phong.vert");
+string fsp = ShaderLoader::LoadShaderFromFile("phong.frag");
+
+
 int main()
 {
     std::cout << "vfs " << vfs.c_str() << std::endl;
     std::cout << "fs " << fs.c_str() << std::endl;
+
+    std::cout << "vfsp " << vfs.c_str() << std::endl;
+    std::cout << "fsp " << fs.c_str() << std::endl;
+
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
@@ -95,6 +105,7 @@ int main()
     // Enable depth testing
     glEnable(GL_DEPTH_TEST);
 
+    // Generer overflatepunkter
     vector<glm::vec3> surfacePoints;
     int pointsOnTheSurface = 10;
     for (int i = 0; i < pointsOnTheSurface; ++i)
@@ -107,83 +118,87 @@ int main()
         }
     }
 
+    // Beregn normaler for overflaten
+    vector<glm::vec3> normals = CalculateSurfaceNormals(surfacePoints, pointsOnTheSurface, controlPoints, 4, 3, knotVectorU, knotVectorV);
+
+    // Opprett indekser for å tegne overflaten som en flate med GL_TRIANGLES
     vector<unsigned int> indices;
     for (int i = 0; i < pointsOnTheSurface - 1; ++i)
     {
         for (int j = 0; j < pointsOnTheSurface - 1; ++j)
         {
-            indices.push_back(i * pointsOnTheSurface + j);
-            indices.push_back((i + 1) * pointsOnTheSurface + j);
-            indices.push_back(i * pointsOnTheSurface + j);
-            indices.push_back(i * pointsOnTheSurface + (j + 1));
+            int start = i * pointsOnTheSurface + j;
+            indices.push_back(start);
+            indices.push_back(start + 1);
+            indices.push_back(start + pointsOnTheSurface);
+
+            indices.push_back(start + 1);
+            indices.push_back(start + pointsOnTheSurface);
+            indices.push_back(start + pointsOnTheSurface + 1);
         }
     }
 
-
-    //For the wireframe 
-    unsigned int VBO, VAO, EBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
+    // Sett opp VAO og VBO for overflatepunkter og normaler
+    unsigned int surfaceVAO, surfaceVBO, normalVBO, EBO;
+    glGenVertexArrays(1, &surfaceVAO);
+    glGenBuffers(1, &surfaceVBO);
+    glGenBuffers(1, &normalVBO);
     glGenBuffers(1, &EBO);
 
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, surfacePoints.size() * sizeof(glm::vec3), &surfacePoints[0], GL_STATIC_DRAW);
+    glBindVertexArray(surfaceVAO);
 
+    // Buffer for posisjoner (overflatepunktene)
+    glBindBuffer(GL_ARRAY_BUFFER, surfaceVBO);
+    glBufferData(GL_ARRAY_BUFFER, surfacePoints.size() * sizeof(glm::vec3), &surfacePoints[0], GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
+    // Buffer for normaler
+    glBindBuffer(GL_ARRAY_BUFFER, normalVBO);
+    glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+
+    // EBO for trekantindekser
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
 
-    //Points on the surface
-    unsigned int surfaceVBO, surfaceVAO;
-    glGenVertexArrays(1, &surfaceVAO);
-    glGenBuffers(1, &surfaceVBO);
+    glBindVertexArray(0); // Frigjør VAO
 
-    glBindVertexArray(surfaceVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, surfaceVBO);
-    glBufferData(GL_ARRAY_BUFFER, surfacePoints.size() * sizeof(glm::vec3), &surfacePoints[0], GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    //For the contol points 
-    unsigned int controlVBO, controlVAO;
-    glGenVertexArrays(1, &controlVAO);
-    glGenBuffers(1, &controlVBO);
-
-    glBindVertexArray(controlVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, controlVBO);
-    glBufferData(GL_ARRAY_BUFFER, controlPoints.size() * sizeof(glm::vec3), &controlPoints[0], GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    // Beregn overflatepunkter og normaler
-    vector<glm::vec3> normals = CalculateSurfaceNormals(surfacePoints, pointsOnTheSurface, controlPoints, 4, 3, knotVectorU, knotVectorV);
-
-    // Sett opp VBO og VAO for normalene
+    // Sett opp VAO for normalene som linjer
+    unsigned int normalVAO, normalLineVBO;
     vector<glm::vec3> normalLines;
-    float normalLength = 0.1f; // Velg en passende lengde for normalene
+    float normalLength = 0.1f;
 
     for (int i = 0; i < surfacePoints.size(); ++i) {
         glm::vec3 startPoint = surfacePoints[i];
         glm::vec3 endPoint = startPoint + normals[i] * normalLength;
-        normalLines.push_back(startPoint); // Legg til startpunkt
-        normalLines.push_back(endPoint);   // Legg til sluttpunkt
+        normalLines.push_back(startPoint);
+        normalLines.push_back(endPoint);
     }
 
-    unsigned int normalVBO, normalVAO;
     glGenVertexArrays(1, &normalVAO);
-    glGenBuffers(1, &normalVBO);
+    glGenBuffers(1, &normalLineVBO);
 
     glBindVertexArray(normalVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, normalVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, normalLineVBO);
     glBufferData(GL_ARRAY_BUFFER, normalLines.size() * sizeof(glm::vec3), &normalLines[0], GL_STATIC_DRAW);
-
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
+    glBindVertexArray(0);
+
+    // Lys- og materialegenskaper
+    glm::vec3 lightPos(10.0f, 10.0f, 10.0f);
+    glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
+    glm::vec3 objectColor(0.1f, 1.0f, 0.1f); // Sett fargen til grønn
+
+    // Bruk Phong-shader
+    Shader phongShader("phong.vert", "phong.frag");
+    phongShader.use();
+    phongShader.setVec3("lightPos", lightPos);
+    phongShader.setVec3("viewPos", camera.Position);  // Passerer kameraets posisjon
+    phongShader.setVec3("lightColor", lightColor);
+    phongShader.setVec3("objectColor", objectColor);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -208,26 +223,34 @@ int main()
         model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
         ourShader.setMat4("model", model);
 
-        //Render wireframe
-        glBindVertexArray(VAO);
-        glDrawElements(GL_LINES, indices.size(), GL_UNSIGNED_INT, 0);
-        glBindVertexArray(0);
+        // 2. Tegn wireframe overflaten
+        //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        //glBindVertexArray(surfaceVAO);
+        //glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+        //glBindVertexArray(0);
 
-        // Render surface points
+        // 3. Tegn punktene på overflaten
         glBindVertexArray(surfaceVAO);
-        glPointSize(6.0f);
+        glPointSize(10.0f); // Størrelsen på punktene
         glDrawArrays(GL_POINTS, 0, surfacePoints.size());
         glBindVertexArray(0);
 
-        // Render control points
-        glBindVertexArray(controlVAO);
-        glPointSize(10.0f);
-        glDrawArrays(GL_POINTS, 0, controlPoints.size());
+        // 4. Tegn normalene som rosa linjer
+        glBindVertexArray(normalVAO);
+        glVertexAttrib3f(1, 1.0f, 0.0f, 1.0f); // Sett rosa farge for normalene
+        glDrawArrays(GL_LINES, 0, normalLines.size());
         glBindVertexArray(0);
 
-        // Render normalene
-        glBindVertexArray(normalVAO);
-        glDrawArrays(GL_LINES, 0, normalLines.size());
+        phongShader.use();
+        phongShader.setMat4("projection", projection);
+        phongShader.setMat4("view", view);
+        phongShader.setMat4("model", model);
+        phongShader.setVec3("viewPos", camera.Position);
+
+        //// 1. Tegn overflaten som en solid flate
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        glBindVertexArray(surfaceVAO);
+        glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
         glfwSwapBuffers(window);
@@ -310,7 +333,8 @@ float BSplineBasis(int i, int k, float t, const vector<float>& knots)
     return term1 + term2;
 }
 
-glm::vec3 BSplineSurface(float u, float v, const vector<glm::vec3>& controlPoints, int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV)
+glm::vec3 BSplineSurface(float u, float v, const vector<glm::vec3>& controlPoints, 
+    int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV)
 {
     glm::vec3 point(0.0f);
     int degreeU = 2, degreeV = 2;
@@ -335,7 +359,8 @@ glm::vec3 BSplineSurface(float u, float v, const vector<glm::vec3>& controlPoint
 }
 
 // Funksjon for å beregne den partielle deriverte med hensyn til u eller v
-glm::vec3 BSplinePartialDerivative(float u, float v, const vector<glm::vec3>& controlPoints, int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV, bool withRespectToU)
+glm::vec3 BSplinePartialDerivative(float u, float v, const vector<glm::vec3>& controlPoints, 
+int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV, bool withRespectToU)
 {
     glm::vec3 derivative(0.0f);
     int degreeU = 2, degreeV = 2;
@@ -358,7 +383,8 @@ glm::vec3 BSplinePartialDerivative(float u, float v, const vector<glm::vec3>& co
     return derivative;
 }
 
-vector<glm::vec3> CalculateSurfaceNormals(const vector<glm::vec3>& surfacePoints, int pointsOnTheSurface, const vector<glm::vec3>& controlPoints, int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV)
+vector<glm::vec3> CalculateSurfaceNormals(const vector<glm::vec3>& surfacePoints, int pointsOnTheSurface, 
+const vector<glm::vec3>& controlPoints, int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV)
 {
     vector<glm::vec3> normals;
     float epsilon = 0.001f; // Liten verdi for å justere u og v nær yttergrensene

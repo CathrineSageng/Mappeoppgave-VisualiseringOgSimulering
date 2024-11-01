@@ -570,6 +570,8 @@
     <None Include="dependencies\include\glm\gtx\vector_query.inl" />
     <None Include="dependencies\include\glm\gtx\wrap.inl" />
     <None Include="fs.fs" />
+    <None Include="phong.frag" />
+    <None Include="phong.vert" />
     <None Include="vs.vs" />
   </ItemGroup>
   <ItemGroup>

@@ -1314,6 +1314,8 @@
     </None>
     <None Include="vs.vs" />
     <None Include="fs.fs" />
+    <None Include="phong.frag" />
+    <None Include="phong.vert" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="dependencies\lib\glfw3.lib" />

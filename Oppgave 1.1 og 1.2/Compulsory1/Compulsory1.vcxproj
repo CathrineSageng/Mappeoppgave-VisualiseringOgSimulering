@@ -434,6 +434,7 @@
     <ClInclude Include="ShaderFileLoader.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="32-2-517-154-22.laz" />
     <None Include="32-2-517-155-12.laz" />
     <None Include="dependencies\include\bin\charset-1.dll" />
     <None Include="dependencies\include\bin\charset-1.pdb" />
@@ -748,6 +749,7 @@
     <Library Include="dependencies\lib\proj.lib" />
   </ItemGroup>
   <ItemGroup>
+    <Text Include="32-2-517-154-22.txt" />
     <Text Include="32-2-517-155-12.txt" />
     <Text Include="dependencies\include\glm\CMakeLists.txt" />
     <Text Include="dependencies\include\proj\vcpkg_abi_info.txt" />

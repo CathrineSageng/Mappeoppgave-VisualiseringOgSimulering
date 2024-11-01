@@ -1483,6 +1483,7 @@
     <None Include="x64\Release\Spline-kurve.iobj" />
     <None Include="x64\Release\Spline-kurve.ipdb" />
     <None Include="x64\Release\vc143.pdb" />
+    <None Include="32-2-517-154-22.laz" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="dependencies\lib\glfw3.lib" />
@@ -1497,6 +1498,7 @@
     <Text Include="x64\Release\Compulsory1.vcxproj.FileListAbsolute.txt" />
     <Text Include="x64\Release\Spline-kurve.Build.CppClean.log" />
     <Text Include="x64\Release\vcpkg.applocal.log" />
+    <Text Include="32-2-517-154-22.txt" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="Textures\ball.jpg">

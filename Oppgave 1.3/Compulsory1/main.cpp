@@ -233,7 +233,7 @@ int main()
     // Lys- og materialegenskaper
     glm::vec3 lightPos(10.0f, 10.0f, 10.0f);
     glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
-    glm::vec3 objectColor(0.0f, 1.0f, 0.0f); // Sett fargen til grønn
+    glm::vec3 objectColor(0.1f, 1.0f, 0.1f); // Sett fargen til grønn
 
     // Bruk Phong-shader
     Shader phongShader("phong.vert", "phong.frag");
@@ -267,10 +267,10 @@ int main()
         ourShader.setMat4("model", model);
 
         //Rendering the points 
-        glBindVertexArray(VAO);
+       /* glBindVertexArray(VAO);
         glPointSize(3.0f); 
         glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(points.size()));
-        glBindVertexArray(0);
+        glBindVertexArray(0);*/
 
         // Rendering av normalvektorer som linjesegmenter
         glBindVertexArray(VAONormals);
@@ -473,7 +473,7 @@ vector<glm::vec3> loadPointsFromMultipleTextFiles(const vector<string>& textFile
 
     for (const auto& textFile : textFiles)
     {
-        vector<glm::vec3> points = loadPointsFromTextFile(textFile, 100000);
+        vector<glm::vec3> points = loadPointsFromTextFile(textFile, 150126);
         allPoints.insert(allPoints.end(), points.begin(), points.end());
     }
 
