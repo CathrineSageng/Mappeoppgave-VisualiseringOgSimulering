@@ -16,6 +16,9 @@ using namespace std;
 const unsigned int SCR_WIDTH = 1600;
 const unsigned int SCR_HEIGHT = 1200;
 
+
+glm::vec3 sunPos(2.0f, 2.0f, 2.0f);
+
 // Camera settings
 //This is the starting position of the of the camera 
 Camera camera(glm::vec3(1.0f, 1.0f, 5.0f));
@@ -31,7 +34,7 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 // Kontrollpunkter fra Kapittel 12.1- B-spline flater. 
-vector<glm::vec3> controlPoints = 
+vector<glm::vec3> controlPoints =
 {
     glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(2.0f, 0.0f, 0.0f), glm::vec3(3.0f, 0.0f, 0.0f),
     glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(1.0f, 1.0f, 2.0f), glm::vec3(2.0f, 1.0f, 2.0f), glm::vec3(3.0f, 1.0f, 0.0f),
@@ -50,9 +53,9 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 float BSplineBasis(int i, int k, float t, const vector<float>& knots);
 glm::vec3 BSplineSurface(float u, float v, const vector<glm::vec3>& controlPoints, int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV);
 glm::vec3 BSplinePartialDerivative(float u, float v, const vector<glm::vec3>& controlPoints, int widthU,
-int widthV, const vector<float>& knotU, const vector<float>& knotV, bool withRespectToU);
-vector<glm::vec3> CalculateSurfaceNormals(const vector<glm::vec3>& surfacePoints, int pointsOnTheSurface, 
-const vector<glm::vec3>& controlPoints, int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV);
+    int widthV, const vector<float>& knotU, const vector<float>& knotV, bool withRespectToU);
+vector<glm::vec3> CalculateSurfaceNormals(const vector<glm::vec3>& surfacePoints, int pointsOnTheSurface,
+    const vector<glm::vec3>& controlPoints, int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV);
 
 
 string vfs = ShaderLoader::LoadShaderFromFile("vs.vs");
@@ -83,7 +86,7 @@ int main()
     GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Spline-kurver", NULL, NULL);
     if (window == NULL)
     {
-        cout << "Failed to create GLFW window" <<endl;
+        cout << "Failed to create GLFW window" << endl;
         glfwTerminate();
         return -1;
     }
@@ -103,6 +106,7 @@ int main()
     // build and compile our shader program
     // ------------------------------------
     Shader ourShader("vs.vs", "fs.fs"); // you can name your shader files however you like
+    Shader phongShader("phong.vert", "phong.frag");
 
     // Enable depth testing
     glEnable(GL_DEPTH_TEST);
@@ -172,7 +176,7 @@ int main()
     vector<glm::vec3> normalLines;
     float normalLength = 0.1f;
 
-    for (int i = 0; i < surfacePoints.size(); ++i) 
+    for (int i = 0; i < surfacePoints.size(); ++i)
     {
         glm::vec3 startPoint = surfacePoints[i];
         glm::vec3 endPoint = startPoint + normals[i] * normalLength;
@@ -190,19 +194,6 @@ int main()
     glEnableVertexAttribArray(0);
     glBindVertexArray(0);
 
-    // Lys- og materialegenskaper
-    glm::vec3 lightPos(10.0f, 10.0f, 10.0f);
-    glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
-    glm::vec3 objectColor(0.1f, 1.0f, 0.1f); // Sett fargen til grønn
-
-    // Bruk Phong-shader
-    Shader phongShader("phong.vert", "phong.frag");
-    phongShader.use();
-    phongShader.setVec3("lightPos", lightPos);
-    phongShader.setVec3("viewPos", camera.Position);  // Passerer kameraets posisjon
-    phongShader.setVec3("lightColor", lightColor);
-    phongShader.setVec3("objectColor", objectColor);
-
     while (!glfwWindowShouldClose(window))
     {
         // Time calculation for movement
@@ -215,15 +206,41 @@ int main()
         glClearColor(0.529f, 0.808f, 0.922f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        ourShader.use();
+        //Referanse for phong shader: https://learnopengl.com/code_viewer_gh.php?code=src/2.lighting/3.1.materials/materials.cpp
+        phongShader.use();
+
+        phongShader.setVec3("light.position", sunPos);
+        phongShader.setVec3("viewPos", camera.Position);
+
+        // Light properties
+        phongShader.setVec3("light.ambient", 0.3f, 0.4f, 0.3f);
+        phongShader.setVec3("light.diffuse", 0.3f, 0.7f, 0.3f);
+        phongShader.setVec3("light.specular", 1.0f, 1.0f, 1.0f);
+
+        // material properties
+        phongShader.setVec3("material.ambient", 0.1f, 0.5f, 0.1f);
+        phongShader.setVec3("material.diffuse", 0.2f, 0.8f, 0.8f);
+        phongShader.setVec3("material.specular", 0.3f, 0.3f, 0.3f);
+        phongShader.setFloat("material.shininess", 32.0f);
 
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
-        ourShader.setMat4("projection", projection);
-        ourShader.setMat4("view", view);
+        phongShader.setMat4("projection", projection);
+        phongShader.setMat4("view", view);
 
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+        phongShader.setMat4("model", model);
+
+        //// 1. Tegn overflaten som en solid flate
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        glBindVertexArray(surfaceVAO);
+        glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+
+        ourShader.use();
+        ourShader.setMat4("projection", projection);
+        ourShader.setMat4("view", view);
         ourShader.setMat4("model", model);
 
         // 2. Tegn wireframe overflaten
@@ -244,17 +261,7 @@ int main()
         glDrawArrays(GL_LINES, 0, normalLines.size());
         glBindVertexArray(0);
 
-        phongShader.use();
-        phongShader.setMat4("projection", projection);
-        phongShader.setMat4("view", view);
-        phongShader.setMat4("model", model);
-        phongShader.setVec3("viewPos", camera.Position);
 
-        //// 1. Tegn overflaten som en solid flate
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glBindVertexArray(surfaceVAO);
-        glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
-        glBindVertexArray(0);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -319,7 +326,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 
 float BSplineBasis(int i, int k, float t, const vector<float>& knots)
 {
-    if (i < 0 || i >= knots.size() - 1) 
+    if (i < 0 || i >= knots.size() - 1)
     {
         return 0.0f;
     }
@@ -337,7 +344,7 @@ float BSplineBasis(int i, int k, float t, const vector<float>& knots)
     return term1 + term2;
 }
 
-glm::vec3 BSplineSurface(float u, float v, const vector<glm::vec3>& controlPoints, 
+glm::vec3 BSplineSurface(float u, float v, const vector<glm::vec3>& controlPoints,
     int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV)
 {
     glm::vec3 point(0.0f);
@@ -363,8 +370,8 @@ glm::vec3 BSplineSurface(float u, float v, const vector<glm::vec3>& controlPoint
 }
 
 // Funksjon for å beregne den partielle deriverte med hensyn til u eller v
-glm::vec3 BSplinePartialDerivative(float u, float v, const vector<glm::vec3>& controlPoints, 
-int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV, bool withRespectToU)
+glm::vec3 BSplinePartialDerivative(float u, float v, const vector<glm::vec3>& controlPoints,
+    int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV, bool withRespectToU)
 {
     glm::vec3 derivative(0.0f);
     int degreeU = 2, degreeV = 2;
@@ -377,7 +384,7 @@ int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV, 
         for (int j = 0; j < widthV; ++j)
         {
             int index = j * widthU + i;
-            if (index < controlPoints.size()) 
+            if (index < controlPoints.size())
             {
                 float basisU = withRespectToU ? BSplineBasis(i, degreeU - 1, scaledU, knotU) : BSplineBasis(i, degreeU, scaledU, knotU);
                 float basisV = withRespectToU ? BSplineBasis(j, degreeV, scaledV, knotV) : BSplineBasis(j, degreeV - 1, scaledV, knotV);
@@ -388,8 +395,8 @@ int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV, 
     return derivative;
 }
 
-vector<glm::vec3> CalculateSurfaceNormals(const vector<glm::vec3>& surfacePoints, int pointsOnTheSurface, 
-const vector<glm::vec3>& controlPoints, int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV)
+vector<glm::vec3> CalculateSurfaceNormals(const vector<glm::vec3>& surfacePoints, int pointsOnTheSurface,
+    const vector<glm::vec3>& controlPoints, int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV)
 {
     vector<glm::vec3> normals;
     float epsilon = 0.001f; // Liten verdi for å justere u og v nær yttergrensene

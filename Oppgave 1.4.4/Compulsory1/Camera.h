@@ -126,3 +126,5 @@ private:
     }
 };
 #endif
+
+//Referanse https://learnopengl.com/code_viewer_gh.php?code=includes/learnopengl/camera.h
