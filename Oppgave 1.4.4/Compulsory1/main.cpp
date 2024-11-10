@@ -1,18 +1,18 @@
-#include<iostream>
+#include <iostream>
 #include "glm/mat4x3.hpp"
-#include<glad/glad.h>
-#include<GLFW/glfw3.h>
-#include<glm/glm.hpp>
-#include<glm/gtc/matrix_transform.hpp>
-#include<glm/gtc/type_ptr.hpp>
-#include<vector>
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <vector>
 #include "Shader.h"
 #include "ShaderFileLoader.h"
 #include "Camera.h"
 
 using namespace std;
 
-// Global variables
+// 
 const unsigned int SCR_WIDTH = 1600;
 const unsigned int SCR_HEIGHT = 1200;
 
@@ -30,16 +30,18 @@ float deltaTime = 0.0f;
 //Stores the timestamp of previous frame. 
 float lastFrame = 0.0f;
 
-//The control points from the Matematikk 3 lecture file, chapter 12. 
-std::vector<glm::vec3> controlPoints = {
-    glm::vec3(0.0f, 0.0f,  0.0f), glm::vec3(1.0f, 0.0f,  0.0f), glm::vec3(2.0f, 0.0f,  0.0f), glm::vec3(3.0f, 0.0f,  0.0f),
-    glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(1.0f, 1.0f,  2.0f), glm::vec3(2.0f, 1.0f,  2.0f), glm::vec3(3.0f, 1.0f,  0.0f),
-    glm::vec3(0.0f, 2.0f,  0.0f), glm::vec3(1.0f,  2.0f,  0.0f), glm::vec3(2.0f,  2.0f,  0.0f), glm::vec3(3.0f,  2.0f,  0.0f),
+// Kontrollpunkter fra Kapittel 12.1- B-spline flater. 
+vector<glm::vec3> controlPoints = 
+{
+    glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(2.0f, 0.0f, 0.0f), glm::vec3(3.0f, 0.0f, 0.0f),
+    glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(1.0f, 1.0f, 2.0f), glm::vec3(2.0f, 1.0f, 2.0f), glm::vec3(3.0f, 1.0f, 0.0f),
+    glm::vec3(0.0f, 2.0f, 0.0f), glm::vec3(1.0f, 2.0f, 0.0f), glm::vec3(2.0f, 2.0f, 0.0f), glm::vec3(3.0f, 2.0f, 0.0f),
 };
 
-// Knutevektorer
-std::vector<float> knotVectorU = { 0, 0, 0, 1, 2, 2, 2 };
-std::vector<float> knotVectorV = { 0, 0, 0, 1, 1, 1 };
+// Uniform skjøtvektor horisontal retning
+vector<float> knotVectorU = { 0, 0, 0, 1, 2, 2, 2 };
+// Uniform skjøtvektor vertikal retning 
+vector<float> knotVectorV = { 0, 0, 0, 1, 1, 1 };
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
@@ -53,8 +55,8 @@ vector<glm::vec3> CalculateSurfaceNormals(const vector<glm::vec3>& surfacePoints
 const vector<glm::vec3>& controlPoints, int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV);
 
 
-std::string vfs = ShaderLoader::LoadShaderFromFile("vs.vs");
-std::string fs = ShaderLoader::LoadShaderFromFile("fs.fs");
+string vfs = ShaderLoader::LoadShaderFromFile("vs.vs");
+string fs = ShaderLoader::LoadShaderFromFile("fs.fs");
 
 string vfsp = ShaderLoader::LoadShaderFromFile("phong.vert");
 string fsp = ShaderLoader::LoadShaderFromFile("phong.frag");
@@ -62,11 +64,11 @@ string fsp = ShaderLoader::LoadShaderFromFile("phong.frag");
 
 int main()
 {
-    std::cout << "vfs " << vfs.c_str() << std::endl;
-    std::cout << "fs " << fs.c_str() << std::endl;
+    cout << "vfs " << vfs.c_str() << endl;
+    cout << "fs " << fs.c_str() << endl;
 
-    std::cout << "vfsp " << vfs.c_str() << std::endl;
-    std::cout << "fsp " << fs.c_str() << std::endl;
+    cout << "vfsp " << vfs.c_str() << endl;
+    cout << "fsp " << fs.c_str() << endl;
 
     // glfw: initialize and configure
     // ------------------------------
@@ -81,7 +83,7 @@ int main()
     GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Spline-kurver", NULL, NULL);
     if (window == NULL)
     {
-        std::cout << "Failed to create GLFW window" << std::endl;
+        cout << "Failed to create GLFW window" <<endl;
         glfwTerminate();
         return -1;
     }
@@ -94,7 +96,7 @@ int main()
     // ---------------------------------------
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
-        std::cout << "Failed to initialize GLAD" << std::endl;
+        cout << "Failed to initialize GLAD" << endl;
         return -1;
     }
 
@@ -170,7 +172,8 @@ int main()
     vector<glm::vec3> normalLines;
     float normalLength = 0.1f;
 
-    for (int i = 0; i < surfacePoints.size(); ++i) {
+    for (int i = 0; i < surfacePoints.size(); ++i) 
+    {
         glm::vec3 startPoint = surfacePoints[i];
         glm::vec3 endPoint = startPoint + normals[i] * normalLength;
         normalLines.push_back(startPoint);
@@ -316,7 +319,8 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 
 float BSplineBasis(int i, int k, float t, const vector<float>& knots)
 {
-    if (i < 0 || i >= knots.size() - 1) {
+    if (i < 0 || i >= knots.size() - 1) 
+    {
         return 0.0f;
     }
 
@@ -373,7 +377,8 @@ int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV, 
         for (int j = 0; j < widthV; ++j)
         {
             int index = j * widthU + i;
-            if (index < controlPoints.size()) {
+            if (index < controlPoints.size()) 
+            {
                 float basisU = withRespectToU ? BSplineBasis(i, degreeU - 1, scaledU, knotU) : BSplineBasis(i, degreeU, scaledU, knotU);
                 float basisV = withRespectToU ? BSplineBasis(j, degreeV, scaledV, knotV) : BSplineBasis(j, degreeV - 1, scaledV, knotV);
                 derivative += basisU * basisV * controlPoints[index];
