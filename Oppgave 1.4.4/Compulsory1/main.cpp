@@ -9,6 +9,7 @@
 #include "Shader.h"
 #include "ShaderFileLoader.h"
 #include "Camera.h"
+#include "Surface.h"
 
 using namespace std;
 
@@ -50,12 +51,6 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-float BSplineBasis(int i, int k, float t, const vector<float>& knots);
-glm::vec3 BSplineSurface(float u, float v, const vector<glm::vec3>& controlPoints, int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV);
-glm::vec3 BSplinePartialDerivative(float u, float v, const vector<glm::vec3>& controlPoints, int widthU,
-    int widthV, const vector<float>& knotU, const vector<float>& knotV, bool withRespectToU);
-vector<glm::vec3> CalculateSurfaceNormals(const vector<glm::vec3>& surfacePoints, int pointsOnTheSurface,
-    const vector<glm::vec3>& controlPoints, int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV);
 
 
 string vfs = ShaderLoader::LoadShaderFromFile("vs.vs");
@@ -108,6 +103,8 @@ int main()
     Shader ourShader("vs.vs", "fs.fs"); // you can name your shader files however you like
     Shader phongShader("phong.vert", "phong.frag");
 
+    Surface surface(controlPoints, 4, 3, knotVectorU, knotVectorV);
+
     // Enable depth testing
     glEnable(GL_DEPTH_TEST);
 
@@ -120,12 +117,12 @@ int main()
         {
             float u = i / static_cast<float>(pointsOnTheSurface - 1);
             float v = j / static_cast<float>(pointsOnTheSurface - 1);
-            surfacePoints.push_back(BSplineSurface(u, v, controlPoints, 4, 3, knotVectorU, knotVectorV));
+            surfacePoints.push_back(surface.calculateSurfacePoint(u, v));
         }
     }
 
     // Beregn normaler for overflaten
-    vector<glm::vec3> normals = CalculateSurfaceNormals(surfacePoints, pointsOnTheSurface, controlPoints, 4, 3, knotVectorU, knotVectorV);
+    vector<glm::vec3> normals = surface.calculateSurfaceNormals(pointsOnTheSurface);
 
     // Opprett indekser for å tegne overflaten som en flate med GL_TRIANGLES
     vector<unsigned int> indices;
@@ -324,108 +321,6 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
     camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
 
-float BSplineBasis(int i, int k, float t, const vector<float>& knots)
-{
-    if (i < 0 || i >= knots.size() - 1)
-    {
-        return 0.0f;
-    }
-
-    if (k == 0)
-    {
-        return (knots[i] <= t && t < knots[i + 1]) ? 1.0f : 0.0f;
-    }
-    float denom1 = knots[i + k] - knots[i];
-    float term1 = (denom1 != 0.0f) ? (t - knots[i]) / denom1 * BSplineBasis(i, k - 1, t, knots) : 0.0f;
-
-    float denom2 = knots[i + k + 1] - knots[i + 1];
-    float term2 = (denom2 != 0.0f) ? (knots[i + k + 1] - t) / denom2 * BSplineBasis(i + 1, k - 1, t, knots) : 0.0f;
-
-    return term1 + term2;
-}
-
-glm::vec3 BSplineSurface(float u, float v, const vector<glm::vec3>& controlPoints,
-    int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV)
-{
-    glm::vec3 point(0.0f);
-    int degreeU = 2, degreeV = 2;
-
-    // Juster skaleringsformel for `u` og `v` slik at de ikke når eksakt siste verdien
-    float scaledU = std::min(u * (knotU[knotU.size() - degreeU - 1] - knotU.front()) + knotU.front(), knotU[knotU.size() - degreeU - 1] - 0.001f);
-    float scaledV = std::min(v * (knotV[knotV.size() - degreeV - 1] - knotV.front()) + knotV.front(), knotV[knotV.size() - degreeV - 1] - 0.001f);
-
-    for (int i = 0; i < widthU; ++i) // Iterer over kolonner i u-retningen
-    {
-        for (int j = 0; j < widthV; ++j) // Iterer over rader i v-retningen
-        {
-            int index = j * widthU + i; // Beregn indeksen riktig
-            if (index < controlPoints.size()) {
-                float basisU = BSplineBasis(i, degreeU, scaledU, knotU);
-                float basisV = BSplineBasis(j, degreeV, scaledV, knotV);
-                point += basisU * basisV * controlPoints[index];
-            }
-        }
-    }
-    return point;
-}
-
-// Funksjon for å beregne den partielle deriverte med hensyn til u eller v
-glm::vec3 BSplinePartialDerivative(float u, float v, const vector<glm::vec3>& controlPoints,
-    int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV, bool withRespectToU)
-{
-    glm::vec3 derivative(0.0f);
-    int degreeU = 2, degreeV = 2;
-
-    float scaledU = u * (knotU[knotU.size() - degreeU - 1] - knotU.front()) + knotU.front();
-    float scaledV = v * (knotV[knotV.size() - degreeV - 1] - knotV.front()) + knotV.front();
-
-    for (int i = 0; i < widthU; ++i)
-    {
-        for (int j = 0; j < widthV; ++j)
-        {
-            int index = j * widthU + i;
-            if (index < controlPoints.size())
-            {
-                float basisU = withRespectToU ? BSplineBasis(i, degreeU - 1, scaledU, knotU) : BSplineBasis(i, degreeU, scaledU, knotU);
-                float basisV = withRespectToU ? BSplineBasis(j, degreeV, scaledV, knotV) : BSplineBasis(j, degreeV - 1, scaledV, knotV);
-                derivative += basisU * basisV * controlPoints[index];
-            }
-        }
-    }
-    return derivative;
-}
-
-vector<glm::vec3> CalculateSurfaceNormals(const vector<glm::vec3>& surfacePoints, int pointsOnTheSurface,
-    const vector<glm::vec3>& controlPoints, int widthU, int widthV, const vector<float>& knotU, const vector<float>& knotV)
-{
-    vector<glm::vec3> normals;
-    float epsilon = 0.001f; // Liten verdi for å justere u og v nær yttergrensene
-
-    for (int i = 0; i < pointsOnTheSurface; ++i)
-    {
-        for (int j = 0; j < pointsOnTheSurface; ++j)
-        {
-            // Beregn u og v, og unngå eksakt 0 eller 1 på yttergrensene
-            float u = i / static_cast<float>(pointsOnTheSurface - 1);
-            float v = j / static_cast<float>(pointsOnTheSurface - 1);
-
-            if (u <= 0.0f) u += epsilon;                  // Juster nedre u-grense
-            else if (u >= 1.0f) u -= epsilon;             // Juster øvre u-grense
-
-            if (v <= 0.0f) v += epsilon;                  // Juster nedre v-grense
-            else if (v >= 1.0f) v -= epsilon;             // Juster øvre v-grense
-
-            // Beregn partielle deriverte
-            glm::vec3 partialU = BSplinePartialDerivative(u, v, controlPoints, widthU, widthV, knotU, knotV, true);
-            glm::vec3 partialV = BSplinePartialDerivative(u, v, controlPoints, widthU, widthV, knotU, knotV, false);
-
-            // Beregn normalen som kryssproduktet av de partielle derivatene
-            glm::vec3 normal = glm::normalize(glm::cross(partialU, partialV));
-            normals.push_back(normal);
-        }
-    }
-    return normals;
-}
 
 
 
