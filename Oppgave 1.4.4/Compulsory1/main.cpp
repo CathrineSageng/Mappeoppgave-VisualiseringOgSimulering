@@ -20,18 +20,15 @@ const unsigned int SCR_HEIGHT = 1200;
 
 glm::vec3 sunPos(2.0f, 2.0f, 2.0f);
 
-// Camera settings
-//This is the starting position of the of the camera 
-Camera camera(glm::vec3(1.0f, 1.0f, 5.0f));
-//Keeps track of the last position of the mouse cursor 
+//Startposisjonen for kameraet
+Camera camera(glm::vec3(1.5f, 1.0f, 3.0f));
+
 GLfloat lastX = SCR_WIDTH / 2.0f;
 GLfloat lastY = SCR_HEIGHT / 2.0f;
-//Avoids sudden jumps in the camera orientation when the mouse is first detected. 
 bool firstMouse = true;
 
-// Time between current frame and last frame
 float deltaTime = 0.0f;
-//Stores the timestamp of previous frame. 
+
 float lastFrame = 0.0f;
 
 // Kontrollpunkter fra Kapittel 12.1- B-spline flater. 
@@ -52,10 +49,10 @@ void processInput(GLFWwindow* window);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
-
 string vfs = ShaderLoader::LoadShaderFromFile("vs.vs");
 string fs = ShaderLoader::LoadShaderFromFile("fs.fs");
 
+//PhongShader
 string vfsp = ShaderLoader::LoadShaderFromFile("phong.vert");
 string fsp = ShaderLoader::LoadShaderFromFile("phong.frag");
 
@@ -68,16 +65,11 @@ int main()
     cout << "vfsp " << vfs.c_str() << endl;
     cout << "fsp " << fs.c_str() << endl;
 
-    // glfw: initialize and configure
-    // ------------------------------
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-
-    // glfw window creation
-    // --------------------
     GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Spline-kurver", NULL, NULL);
     if (window == NULL)
     {
@@ -90,106 +82,26 @@ int main()
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
 
-    // glad: load all OpenGL function pointers
-    // ---------------------------------------
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
         cout << "Failed to initialize GLAD" << endl;
         return -1;
     }
 
-    // build and compile our shader program
-    // ------------------------------------
-    Shader ourShader("vs.vs", "fs.fs"); // you can name your shader files however you like
+    Shader ourShader("vs.vs", "fs.fs");
     Shader phongShader("phong.vert", "phong.frag");
 
     Surface surface(controlPoints, 4, 3, knotVectorU, knotVectorV);
 
-    // Enable depth testing
-    glEnable(GL_DEPTH_TEST);
+    unsigned int surfaceVAO, surfaceVBO, normalVBO, EBO, normalVAO, normalLineVBO;
 
-    // Generer overflatepunkter
-    vector<glm::vec3> surfacePoints;
+    //Hvor glatt overflaten skal være 
     int pointsOnTheSurface = 10;
-    for (int i = 0; i < pointsOnTheSurface; ++i)
-    {
-        for (int j = 0; j < pointsOnTheSurface; ++j)
-        {
-            float u = i / static_cast<float>(pointsOnTheSurface - 1);
-            float v = j / static_cast<float>(pointsOnTheSurface - 1);
-            surfacePoints.push_back(surface.calculateSurfacePoint(u, v));
-        }
-    }
 
-    // Beregn normaler for overflaten
-    vector<glm::vec3> normals = surface.calculateSurfaceNormals(pointsOnTheSurface);
+    surface.setupBuffers(surfaceVAO, surfaceVBO, normalVBO, EBO, normalVAO, normalLineVBO, pointsOnTheSurface);
 
-    // Opprett indekser for å tegne overflaten som en flate med GL_TRIANGLES
-    vector<unsigned int> indices;
-    for (int i = 0; i < pointsOnTheSurface - 1; ++i)
-    {
-        for (int j = 0; j < pointsOnTheSurface - 1; ++j)
-        {
-            int start = i * pointsOnTheSurface + j;
-            indices.push_back(start);
-            indices.push_back(start + 1);
-            indices.push_back(start + pointsOnTheSurface);
 
-            indices.push_back(start + 1);
-            indices.push_back(start + pointsOnTheSurface);
-            indices.push_back(start + pointsOnTheSurface + 1);
-        }
-    }
-
-    // Sett opp VAO og VBO for overflatepunkter og normaler
-    unsigned int surfaceVAO, surfaceVBO, normalVBO, EBO;
-    glGenVertexArrays(1, &surfaceVAO);
-    glGenBuffers(1, &surfaceVBO);
-    glGenBuffers(1, &normalVBO);
-    glGenBuffers(1, &EBO);
-
-    glBindVertexArray(surfaceVAO);
-
-    // Buffer for posisjoner (overflatepunktene)
-    glBindBuffer(GL_ARRAY_BUFFER, surfaceVBO);
-    glBufferData(GL_ARRAY_BUFFER, surfacePoints.size() * sizeof(glm::vec3), &surfacePoints[0], GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    // Buffer for normaler
-    glBindBuffer(GL_ARRAY_BUFFER, normalVBO);
-    glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-
-    // EBO for trekantindekser
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
-
-    glBindVertexArray(0); // Frigjør VAO
-
-    // Sett opp VAO for normalene som linjer
-    unsigned int normalVAO, normalLineVBO;
-    vector<glm::vec3> normalLines;
-    float normalLength = 0.1f;
-
-    for (int i = 0; i < surfacePoints.size(); ++i)
-    {
-        glm::vec3 startPoint = surfacePoints[i];
-        glm::vec3 endPoint = startPoint + normals[i] * normalLength;
-        normalLines.push_back(startPoint);
-        normalLines.push_back(endPoint);
-    }
-
-    glGenVertexArrays(1, &normalVAO);
-    glGenBuffers(1, &normalLineVBO);
-
-    glBindVertexArray(normalVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, normalLineVBO);
-    glBufferData(GL_ARRAY_BUFFER, normalLines.size() * sizeof(glm::vec3), &normalLines[0], GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glBindVertexArray(0);
+    glEnable(GL_DEPTH_TEST);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -209,12 +121,12 @@ int main()
         phongShader.setVec3("light.position", sunPos);
         phongShader.setVec3("viewPos", camera.Position);
 
-        // Light properties
+        // Egenskaper for lys
         phongShader.setVec3("light.ambient", 0.3f, 0.4f, 0.3f);
         phongShader.setVec3("light.diffuse", 0.3f, 0.7f, 0.3f);
         phongShader.setVec3("light.specular", 1.0f, 1.0f, 1.0f);
 
-        // material properties
+        // Egenskaper for materialer
         phongShader.setVec3("material.ambient", 0.1f, 0.5f, 0.1f);
         phongShader.setVec3("material.diffuse", 0.2f, 0.8f, 0.8f);
         phongShader.setVec3("material.specular", 0.3f, 0.3f, 0.3f);
@@ -229,10 +141,10 @@ int main()
         model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
         phongShader.setMat4("model", model);
 
-        //// 1. Tegn overflaten som en solid flate
+        // Rendrer bikvadratisk b- spline tensorprodukt flate 
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glBindVertexArray(surfaceVAO);
-        glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, pointsOnTheSurface * pointsOnTheSurface * 6, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
         ourShader.use();
@@ -240,37 +152,20 @@ int main()
         ourShader.setMat4("view", view);
         ourShader.setMat4("model", model);
 
-        // 2. Tegn wireframe overflaten
-        //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        //glBindVertexArray(surfaceVAO);
-        //glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
-        //glBindVertexArray(0);
-
-        // 3. Tegn punktene på overflaten
-        glBindVertexArray(surfaceVAO);
-        glPointSize(10.0f); // Størrelsen på punktene
-        glDrawArrays(GL_POINTS, 0, surfacePoints.size());
-        glBindVertexArray(0);
-
-        // 4. Tegn normalene som rosa linjer
+        //Rendrer normaler på overflaten 
         glBindVertexArray(normalVAO);
-        glVertexAttrib3f(1, 1.0f, 0.0f, 1.0f); // Sett rosa farge for normalene
-        glDrawArrays(GL_LINES, 0, normalLines.size());
+        glVertexAttrib3f(1, 1.0f, 0.0f, 1.0f);
+        glDrawArrays(GL_LINES, 0, pointsOnTheSurface * pointsOnTheSurface * 2);
         glBindVertexArray(0);
-
-
 
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
-    // glfw: terminate, clearing all previously allocated GLFW resources.
-    // ------------------------------------------------------------------
+
     glfwTerminate();
     return 0;
 }
 
-// process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
-// ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow* window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -286,12 +181,9 @@ void processInput(GLFWwindow* window)
         camera.ProcessKeyboard(RIGHT, deltaTime);
 }
 
-// glfw: whenever the window size changed (by OS or user resize) this callback function executes
-// ---------------------------------------------------------------------------------------------
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
-    // make sure the viewport matches the new window dimensions; note that width and 
-    // height will be significantly larger than specified on retina displays.
+
     glViewport(0, 0, width, height);
 }
 
