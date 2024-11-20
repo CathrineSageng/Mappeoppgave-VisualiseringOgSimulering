@@ -144,32 +144,138 @@ vector<unsigned int> Surface::generateIndices(int pointsOnTheSurface) const
     return indices;
 }
 
+std::vector<glm::vec3> Surface::calculateBSplineCurve(const std::vector<glm::vec3>& controlPoints, int degree, int resolution) const {
+    std::vector<glm::vec3> splinePoints;
+
+    if (controlPoints.size() < degree + 1) {
+        return splinePoints; // Ikke nok punkter for B-spline
+    }
+
+    // Fjern uønskede punkter som (0,0,0)
+    std::vector<glm::vec3> validControlPoints;
+    for (const auto& point : controlPoints) {
+        if (point != glm::vec3(0.0f, 0.0f, 0.0f)) {
+            validControlPoints.push_back(point);
+        }
+    }
+
+    if (validControlPoints.size() < degree + 1) {
+        return splinePoints; // Ikke nok gyldige punkter
+    }
+
+    // Fortsett som før med `validControlPoints` i stedet for `controlPoints`
+    int knotCount = validControlPoints.size() + degree + 1;
+    std::vector<float> knots(knotCount);
+    for (int i = 0; i < knotCount; ++i) {
+        knots[i] = i < degree + 1 ? 0.0f : (i > validControlPoints.size() ? 1.0f : (float)(i - degree) / (validControlPoints.size() - degree));
+    }
+
+    for (int step = 0; step <= resolution; ++step) {
+        float t = step / static_cast<float>(resolution);
+
+        glm::vec3 point(0.0f);
+        for (int i = 0; i < validControlPoints.size(); ++i) {
+            float basis = BSplineBasisFunctions(i, degree, t, knots);
+            point += basis * validControlPoints[i];
+        }
+
+        splinePoints.push_back(point);
+    }
+
+    return splinePoints;
+}
+
+
+void Surface::renderBSplineCurve(const std::vector<glm::vec3>& curvePoints, Shader& shader, glm::mat4& projection, glm::mat4& view) const {
+    std::vector<float> vertices;
+
+    for (const auto& point : curvePoints) {
+        if (point == glm::vec3(0.0f, 0.0f, 0.0f)) {
+            continue; // Hopp over uønskede punkter
+        }
+        vertices.push_back(point.x);
+        vertices.push_back(point.y);
+        vertices.push_back(point.z);
+    }
+
+    if (vertices.empty()) {
+        return; // Ingenting å tegne
+    }
+
+    unsigned int VAO, VBO;
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    shader.use();
+    shader.setMat4("projection", projection);
+    shader.setMat4("view", view);
+    glBindVertexArray(VAO);
+    glDrawArrays(GL_LINE_STRIP, 0, vertices.size() / 3);
+    glBindVertexArray(0);
+
+    glDeleteVertexArrays(1, &VAO);
+    glDeleteBuffers(1, &VBO);
+}
+
 //Denne funksjonene beregner overflatepunkter, normaler og oppterrer VAO, VBO for overflaten og normalene. 
 //den fyller og binder bufferne med data for punkter normaler og trekantindekser. 
-void Surface::setupBuffers(unsigned int& surfaceVAO, unsigned int& surfaceVBO, unsigned int& normalVBO,
-    unsigned int& EBO, unsigned int& normalVAO, unsigned int& normalLineVBO,
-    int pointsOnTheSurface) 
+void Surface::setupBuffers(unsigned int& surfaceVAO, unsigned int& surfaceVBO, unsigned int& colorVBO,
+    unsigned int& normalVBO, unsigned int& EBO, unsigned int& normalVAO, unsigned int& normalLineVBO,
+    int pointsOnTheSurface, float frictionAreaXMin, float frictionAreaXMax,
+    float frictionAreaYMin, float frictionAreaYMax)
 {
     vector<glm::vec3> surfacePoints = calculateSurfacePoints(pointsOnTheSurface);
     vector<glm::vec3> normals = calculateSurfaceNormals(pointsOnTheSurface);
     vector<unsigned int> indices = generateIndices(pointsOnTheSurface);
+    vector<glm::vec3> colors;
+
+    // Generer farger for friksjonsområdet
+    for (const glm::vec3& point : surfacePoints) {
+        if (point.x >= frictionAreaXMin && point.x <= frictionAreaXMax &&
+            point.y >= frictionAreaYMin && point.y <= frictionAreaYMax) {
+            // Sett friksjonsområdet til rød farge
+            colors.push_back(glm::vec3(1.0f, 0.0f, 0.0f));
+        }
+        else {
+            // Sett resten av overflaten til en nøytral farge
+            colors.push_back(glm::vec3(0.7f, 0.7f, 0.7f));
+        }
+    }
 
     glGenVertexArrays(1, &surfaceVAO);
     glGenBuffers(1, &surfaceVBO);
+    glGenBuffers(1, &colorVBO);
     glGenBuffers(1, &normalVBO);
     glGenBuffers(1, &EBO);
 
     glBindVertexArray(surfaceVAO);
+
+    // Buffer for posisjoner
     glBindBuffer(GL_ARRAY_BUFFER, surfaceVBO);
     glBufferData(GL_ARRAY_BUFFER, surfacePoints.size() * sizeof(glm::vec3), &surfacePoints[0], GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    glBindBuffer(GL_ARRAY_BUFFER, normalVBO);
-    glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
+    // Buffer for farger
+    glBindBuffer(GL_ARRAY_BUFFER, colorVBO);
+    glBufferData(GL_ARRAY_BUFFER, colors.size() * sizeof(glm::vec3), &colors[0], GL_STATIC_DRAW);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(1);
 
+    // Buffer for normaler
+    glBindBuffer(GL_ARRAY_BUFFER, normalVBO);
+    glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(2);
+
+    // Indeksbuffer
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
 
@@ -193,6 +299,6 @@ void Surface::setupBuffers(unsigned int& surfaceVAO, unsigned int& surfaceVBO, u
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    glBindVertexArray(0); 
+    glBindVertexArray(0);
 }
 

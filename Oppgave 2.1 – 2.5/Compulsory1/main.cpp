@@ -12,12 +12,12 @@
 #include "Surface.h"
 #include "Ball.h"
 #include "Octree.h"
+#include "PhysicsCalculations.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
 
 using namespace std;
-
 //---------------------GLOBALE VARIABLER----------------------------------------------------------------------------------------------------------------//
 const unsigned int SCR_WIDTH = 1600;
 const unsigned int SCR_HEIGHT = 1200;
@@ -30,6 +30,7 @@ float yMax = 2.0f;
 
 //Ballenes fart 
 float ballSpeed = 2.5f;
+
 //Ballene beveger seg ikke når programmet starter
 bool ballsMoving = false;
 //Størrelsen på ballene 
@@ -37,12 +38,27 @@ float ballRadius = 0.1f;
 
 bool firstMouse = true;
 
-float deltaTime = 0.0f;
+double deltaTime = 0.0f;
 
-float lastFrame = 0.0f;
+double lastFrame = 0.0f;
 
 GLfloat lastX = SCR_WIDTH / 2.0f;
 GLfloat lastY = SCR_HEIGHT / 2.0f;
+
+const double fixedTimeStep = 0.01f;
+double accumulator = 0.0f;
+
+bool pointSelected = false;
+glm::vec3 selectedPoint;
+
+// Friksjonsområde (definerer grenser)
+float frictionAreaXMin = 0.0f;
+float frictionAreaXMax = 1.0f;
+float frictionAreaYMin = 0.0f;
+float frictionAreaYMax = 1.0f;
+
+float normalFriction = 0.01f; // Lav friksjon utenfor området
+float highFriction = 0.5f;   // Høy friksjon i området (stor reduksjon)
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------------//
 
@@ -59,8 +75,8 @@ std::vector<glm::vec3> ballPositions =
 };
 
 //Startretningen på ballene 
-glm::vec3 ballVelocity01(0.5f, 2.0f, 0.5f);
-glm::vec3 ballVelocity02(-3.0f, -2.0f, 0.4f);
+glm::vec3 ballVelocity01(2.0f, -1.0f, 0.0f);
+glm::vec3 ballVelocity02(-2.0f, -1.0f, 0.0f);
 
 vector<glm::vec3> ballVelocities = 
 {
@@ -72,6 +88,8 @@ vector<glm::vec3> ballColors =
     //Hvit bakgrunnsfare på teksturen
     glm::vec3(1.0f, 1.0f, 1.0f),
 };
+
+std::vector<std::vector<glm::vec3>> ballTrajectories(ballPositions.size());
 
 //Startposisjonen for kameraet
 Camera camera(glm::vec3(1.5f, 1.0f, 3.0f));
@@ -95,18 +113,15 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-bool checkCollision(glm::vec3 posA, glm::vec3 posB, float radiusA, float radiusB);
-void whenCollisionHappens(glm::vec3& p1, glm::vec3& v1, glm::vec3& p2, glm::vec3& v2, float radius);
 unsigned int loadTexture(const char* path);
+void selectStartPointForBall(Surface& surface, glm::vec3& ballPosition, float xMin, float xMax, float yMin, float yMax, float ballRadius);
 
 //----------------Shadere til tekstur, phongShader---------------------------------------------------------------------------------------------//
-string vfs = ShaderLoader::LoadShaderFromFile("vs.vs");
-string fs = ShaderLoader::LoadShaderFromFile("fs.fs");
-
 //PhongShader
 string vfsp = ShaderLoader::LoadShaderFromFile("phong.vert");
 string fsp = ShaderLoader::LoadShaderFromFile("phong.frag");
 
+//Tekstur shader til tekstur på ballene 
 string vfsT = ShaderLoader::LoadShaderFromFile("Texture.vs");
 string fsT = ShaderLoader::LoadShaderFromFile("Texture.fs");
 
@@ -136,23 +151,34 @@ int main()
         cout << "Failed to initialize GLAD" << endl;
         return -1;
     }
-
-    Shader ourShader("vs.vs", "fs.fs"); 
     Shader phongShader("phong.vert", "phong.frag");
     Shader textureShader("Texture.vs", "Texture.fs");
 
     glEnable(GL_DEPTH_TEST);
 
     Surface surface(controlPoints, 4, 3, knotVectorU, knotVectorV);
-
-    unsigned int surfaceVAO, surfaceVBO, normalVBO, EBO, normalVAO, normalLineVBO;
-
-    //Hvor glatt overflaten skal være 
-    int pointsOnTheSurface = 10;
-
-    surface.setupBuffers(surfaceVAO, surfaceVBO, normalVBO, EBO, normalVAO, normalLineVBO, pointsOnTheSurface);
+    // The Octree is created over the box with the mininum and maximum boundaries. 
+    Octree octree(glm::vec3(xMin, yMin, xMin), glm::vec3(xMax, yMax, xMax), 0, 4, 4);
 
     vector<Ball> balls;
+
+    PhysicsCalculations physics(xMin, xMax, yMin, yMax, ballRadius);
+
+    unsigned int surfaceVAO, surfaceVBO, colorVBO, normalVBO, EBO, normalVAO, normalLineVBO;
+
+    //Hvor glatt overflaten skal være 
+    int pointsOnTheSurface = 20;
+
+    // Oppdater setupBuffers-kallet med friksjonsgrenser
+    surface.setupBuffers(surfaceVAO, surfaceVBO, colorVBO, normalVBO, EBO, normalVAO, normalLineVBO,
+        pointsOnTheSurface, frictionAreaXMin, frictionAreaXMax,
+        frictionAreaYMin, frictionAreaYMax);
+
+    physics.updatePhysics(ballPositions, ballVelocities, ballTrajectories, octree, ballsMoving,
+        fixedTimeStep, ballRadius, xMin, xMax, yMin, yMax, surface,
+        normalFriction, highFriction, frictionAreaXMin, frictionAreaXMax,
+        frictionAreaYMin, frictionAreaYMax);
+
     for (int i = 0; i < ballPositions.size(); ++i)
     {
         glm::vec3 ballColor = ballColors[i % ballColors.size()]; // Assign a color from the color list
@@ -167,10 +193,23 @@ int main()
     textureShader.setInt("material.diffuse", 0);
     textureShader.setInt("material.specular", 1);
 
+    
+
+    // Vis koordinatgrenser
+    std::cout << "Koordinatgrenser:\n";
+    std::cout << "x: [" << xMin << ", " << xMax << "]\n";
+    std::cout << "y: [" << yMin << ", " << yMax << "]\n";
+
+    // Obligatorisk interaktiv plassering av ballene
+    for (int i = 0; i < ballPositions.size(); ++i) {
+        std::cout << "Velg posisjon for ball " << i + 1 << ":\n";
+        selectStartPointForBall(surface, ballPositions[i], xMin, xMax, yMin, yMax, ballRadius);
+
+    }
+
     while (!glfwWindowShouldClose(window))
     {
-        // Time calculation for movement
-        float currentFrame = static_cast<float>(glfwGetTime());
+        double currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
@@ -211,6 +250,16 @@ int main()
         glDrawElements(GL_TRIANGLES, pointsOnTheSurface * pointsOnTheSurface * 6, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
+        //Rendrer b-spline kurven som er sporing av banen til ballene. 
+        for (int i = 0; i < ballTrajectories.size(); ++i) 
+        {
+            if (ballTrajectories[i].size() > 1) 
+            {
+                auto curvePoints = surface.calculateBSplineCurve(ballTrajectories[i], 3, 50);
+                surface.renderBSplineCurve(curvePoints, phongShader, projection, view);
+            }
+        }
+
         textureShader.use();
         textureShader.setVec3("light.position", sunPos);
         textureShader.setVec3("viewPos", camera.Position);
@@ -226,65 +275,26 @@ int main()
         textureShader.setMat4("projection", projection);
         textureShader.setMat4("view", view);
 
-        if (ballsMoving)
+        accumulator += deltaTime;
+
+        while (accumulator >= fixedTimeStep)
         {
-            // The Octree is created over the box with the mininum and maximum boundaries. 
-            Octree octree(glm::vec3(xMin, yMin, xMin), glm::vec3(xMax, yMax, xMax), 0, 4, 4);
-
-            // Updates the ball positions and inserts each ball into the octree
-            for (int i = 0; i < ballPositions.size(); ++i)
-            {
-                // Oppdater ballenes posisjon basert på hastigheten og delta-tid
-                ballPositions[i].x += ballVelocities[i].x * deltaTime;
-                ballPositions[i].y += ballVelocities[i].y * deltaTime;
-
-                // Oppretthold konstant hastighet
-                ballVelocities[i] = glm::normalize(ballVelocities[i]) * ballSpeed;
-
-                // Sjekk om ballene har nådd kantene og reverser hastigheten
-                if (ballPositions[i].x - ballRadius <= xMin || ballPositions[i].x + ballRadius >= xMax)
-                {
-                    ballVelocities[i].x = -ballVelocities[i].x;
-                    ballPositions[i].x = glm::clamp(ballPositions[i].x, xMin + ballRadius, xMax - ballRadius);
-                }
-
-                if (ballPositions[i].y - ballRadius <= yMin || ballPositions[i].y + ballRadius >= yMax)
-                {
-                    ballVelocities[i].y = -ballVelocities[i].y;
-                    ballPositions[i].y = glm::clamp(ballPositions[i].y, yMin + ballRadius, yMax - ballRadius);
-                }
-
-                // Normaliser ballens posisjon til [0, 1] for u og v (B-spline-flate)
-                float u = (ballPositions[i].x - xMin) / (xMax - xMin);
-                float v = (ballPositions[i].y - yMin) / (yMax - yMin);
-
-                // Beregn høyden på B-spline-flaten ved (u, v)
-                glm::vec3 surfacePoint = surface.calculateSurfacePoint(u, v);
-
-                // Sett ballens z-posisjon lik høyden på flaten
-                ballPositions[i].z = surfacePoint.z + ballRadius;
-
-
-                // Each ball is inserted into the octree with index, radius and position. This helps for faster collision detection
-                octree.insert(i, ballPositions, ballRadius);
-            }
-
-            // The pairs of balls that can potentially collide is stored inside the vector named i and j
-            vector<pair<int, int>> potentialCollisions;
-            octree.getPotentialCollisions(potentialCollisions, ballPositions, ballRadius);
-
-            // Goes trough each potential collision and checks if the balls are actually colliding. 
-            for (const pair<int, int>& pair : potentialCollisions)
-            {
-                int i = pair.first; //Gets the index of the first ball in the pair
-                int j = pair.second; //Gets the index of the second ball in the pair
-
-                //If the balls are colliding the function adjuts the positions and velocity of the two balls 
-                if (checkCollision(ballPositions[i], ballPositions[j], ballRadius, ballRadius))
-                {
-                    whenCollisionHappens(ballPositions[i], ballVelocities[i], ballPositions[j], ballVelocities[j], ballRadius);
-                }
-            }
+            physics.updatePhysics(
+                ballPositions,         // Ballenes posisjoner
+                ballVelocities,        // Ballenes hastigheter
+                ballTrajectories,      // Ballenes spor (trajectories)
+                octree,                // Octree for kollisjonsberegning
+                ballsMoving,           // Om ballene beveger seg
+                fixedTimeStep,         // Fast tidssteg
+                ballRadius,            // Radiusen til ballene
+                xMin, xMax, yMin, yMax,// Grenser for flaten
+                surface,               // Overflate (B-spline flate)
+                normalFriction,        // Lav friksjon
+                highFriction,          // Høy friksjon
+                frictionAreaXMin, frictionAreaXMax, // Friksjonsområde i x-retning
+                frictionAreaYMin, frictionAreaYMax  // Friksjonsområde i y-retning
+            );
+            accumulator -= fixedTimeStep;
         }
 
         glActiveTexture(GL_TEXTURE0);
@@ -302,6 +312,7 @@ int main()
             textureShader.setMat4("model", model);
             balls[i].DrawBall();
         }
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
@@ -362,47 +373,6 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
     camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
 
-bool checkCollision(glm::vec3 posA, glm::vec3 posB, float radiusA, float radiusB)
-{
-    float distance = glm::distance(posA, posB);
-    return distance < (radiusA + radiusB);
-}
-
-void whenCollisionHappens(glm::vec3& p1, glm::vec3& v1, glm::vec3& p2, glm::vec3& v2, float radius)
-{
-    float m1 = 1.0f;
-    float m2 = 1.0f;
-
-    glm::vec3 normal = p1 - p2;
-    float distance = glm::length(normal);
-    normal = glm::normalize(normal);
-
-
-    float overlap = radius * 2 - distance;
-    if (overlap > 0)
-    {
-        glm::vec3 seperateTheBalls = normal * (overlap / 2.0f);
-
-        p1 += seperateTheBalls;
-        p2 -= seperateTheBalls;
-    }
-
-    glm::vec3 differenceBetweenTheVelocitiesOftheTwoBalls = v1 - v2;
-
-    float velocityAlongNormal = glm::dot(differenceBetweenTheVelocitiesOftheTwoBalls, normal);
-
-    if (velocityAlongNormal > 0)
-        return;
-
-    float e = 1.0f;
-    float j = -(1 + e) * velocityAlongNormal / (1 / m1 + 1 / m2);
-
-    glm::vec3 impulse = j * normal;
-
-    v1 += impulse / m1;
-    v2 -= impulse / m2;
-}
-
 unsigned int loadTexture(char const* path)
 {
     unsigned int textureID;
@@ -439,6 +409,37 @@ unsigned int loadTexture(char const* path)
 
     return textureID;
 }
+
+void selectStartPointForBall(Surface& surface, glm::vec3& ballPosition, float xMin, float xMax, float yMin, float yMax, float ballRadius)
+{
+    float x, y;
+    std::cout << "Velg startpunkt for ballen innenfor oppgitte koordinatgrenser:\n";
+    std::cout << "x (mellom " << xMin << " og " << xMax << "): ";
+    std::cin >> x;
+    std::cout << "y (mellom " << yMin << " og " << yMax << "): ";
+    std::cin >> y;
+
+    // Begrens til gyldige koordinater
+    x = glm::clamp(x, xMin, xMax);
+    y = glm::clamp(y, yMin, yMax);
+
+    // Beregn normaliserte verdier for B-spline-flaten
+    float u = (x - xMin) / (xMax - xMin);
+    float v = (y - yMin) / (yMax - yMin);
+
+    // Finn høyden på B-spline-flaten (z-verdi)
+    glm::vec3 surfacePoint = surface.calculateSurfacePoint(u, v);
+
+    // Sett ballens posisjon
+    ballPosition = glm::vec3(x, y, surfacePoint.z + ballRadius);
+
+    std::cout << "Ballen er plassert på punkt ("
+        << ballPosition.x << ", "
+        << ballPosition.y << ", "
+        << ballPosition.z << ").\n";
+}
+
+
 
 
 

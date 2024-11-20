@@ -139,6 +139,7 @@
     <ClCompile Include="glad.c" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Octree.cpp" />
+    <ClCompile Include="PhysicsCalculations.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="ShaderFileLoader.cpp" />
     <ClCompile Include="Surface.cpp" />
@@ -434,6 +435,7 @@
     <ClInclude Include="dependencies\include\KHR\khrplatform.h" />
     <ClInclude Include="dependencies\include\stb\stb_image.h" />
     <ClInclude Include="Octree.h" />
+    <ClInclude Include="PhysicsCalculations.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="ShaderFileLoader.h" />
     <ClInclude Include="Surface.h" />
@@ -575,12 +577,10 @@
     <None Include="dependencies\include\glm\gtx\vector_angle.inl" />
     <None Include="dependencies\include\glm\gtx\vector_query.inl" />
     <None Include="dependencies\include\glm\gtx\wrap.inl" />
-    <None Include="fs.fs" />
     <None Include="phong.frag" />
     <None Include="phong.vert" />
     <None Include="Texture.fs" />
     <None Include="Texture.vs" />
-    <None Include="vs.vs" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="dependencies\lib\glfw3.lib" />
