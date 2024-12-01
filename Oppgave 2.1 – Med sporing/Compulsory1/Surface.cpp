@@ -185,20 +185,22 @@ std::vector<glm::vec3> Surface::calculateBSplineCurve(const std::vector<glm::vec
     return splinePoints;
 }
 
-
 void Surface::renderBSplineCurve(const std::vector<glm::vec3>& curvePoints, Shader& shader, glm::mat4& projection, glm::mat4& view) const {
-    std::vector<float> vertices;
+    static std::vector<float> permanentVertices; // Permanent buffer for å holde alle rendrede punkter
+    static glm::vec3 lastPoint(0.0f, 0.0f, 0.0f); // Forrige punkt
+    float pointSpacing = 0.1f; // Minimum avstand mellom prikkene
 
     for (const auto& point : curvePoints) {
-        if (point == glm::vec3(0.0f, 0.0f, 0.0f)) {
-            continue; // Hopp over uønskede punkter
+        // Legg til punktet hvis det oppfyller avstandskravet
+        if (permanentVertices.empty() || glm::distance(lastPoint, point) >= pointSpacing) {
+            permanentVertices.push_back(point.x);
+            permanentVertices.push_back(point.y);
+            permanentVertices.push_back(point.z);
+            lastPoint = point;
         }
-        vertices.push_back(point.x);
-        vertices.push_back(point.y);
-        vertices.push_back(point.z);
     }
 
-    if (vertices.empty()) {
+    if (permanentVertices.empty()) {
         return; // Ingenting å tegne
     }
 
@@ -208,7 +210,7 @@ void Surface::renderBSplineCurve(const std::vector<glm::vec3>& curvePoints, Shad
 
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, permanentVertices.size() * sizeof(float), permanentVertices.data(), GL_STATIC_DRAW);
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
@@ -216,13 +218,17 @@ void Surface::renderBSplineCurve(const std::vector<glm::vec3>& curvePoints, Shad
     shader.use();
     shader.setMat4("projection", projection);
     shader.setMat4("view", view);
+
+    // Tegn prikkene som punkter
+    glPointSize(5.0f); // Størrelsen på prikkene
     glBindVertexArray(VAO);
-    glDrawArrays(GL_LINE_STRIP, 0, vertices.size() / 3);
+    glDrawArrays(GL_POINTS, 0, permanentVertices.size() / 3);
     glBindVertexArray(0);
 
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
 }
+
 
 //Denne funksjonene beregner overflatepunkter, normaler og oppterrer VAO, VBO for overflaten og normalene. 
 //den fyller og binder bufferne med data for punkter normaler og trekantindekser. 
@@ -301,4 +307,3 @@ void Surface::setupBuffers(unsigned int& surfaceVAO, unsigned int& surfaceVBO, u
 
     glBindVertexArray(0);
 }
-
