@@ -10,31 +10,32 @@ BilinearSurface::~BilinearSurface()
     cleanup();
 }
 
-void BilinearSurface::loadAndInitialize(const string& filename, float reductionCellSize) {
-    points = loadPointsFromTextFile(filename);
+void BilinearSurface::loadFunctions(const string& filename, float reductionCellSize) 
+{
+    points = loadsPointsFromTextfile(filename);
     points = reducePoints(points, reductionCellSize);
 
     triangles = delaunayTriangulation(points);
-    vertices = calculateVertices(points, triangles);
+    vertices = Normals(points, triangles);
 
-    // Prepare normal line data
-    for (const auto& vertex : vertices) {
+    for (const auto& vertex : vertices) 
+    {
         glm::vec3 start = vertex.position;
-        glm::vec3 end = start + vertex.normal * 0.001f; // Adjust normal length
+        glm::vec3 end = start + vertex.normal * 0.001f;
         normalLines.push_back(start);
         normalLines.push_back(end);
     }
 
-    // Beregn kontrollpunkter
     controlPoints = calculateControlPoints(points, triangles);
 
     setupPointBuffers();
     setupBuffers();
     setupNormalBuffers();
-    setupControlPointBuffers(); // Sett opp buffer for kontrollpunkter
+    setupControlPointBuffers(); 
 }
 
-vector<glm::vec3> BilinearSurface::loadPointsFromTextFile(const string& filename) {
+//Referanse https://www.geeksforgeeks.org/how-to-read-from-a-file-in-cpp/
+vector<glm::vec3> BilinearSurface::loadsPointsFromTextfile(const string& filename) {
     ifstream inFile(filename);
     vector<glm::vec3> points;
 
@@ -51,7 +52,8 @@ vector<glm::vec3> BilinearSurface::loadPointsFromTextFile(const string& filename
     const float zScale = 0.0002f;
     const glm::vec3 translationOffset(-59.0f, -663.0f, 0.0f);
 
-    while (inFile >> x >> y >> z) {
+    while (inFile >> x >> y >> z) 
+    {
         glm::vec3 point(x * xScale, y * yScale, z * zScale);
         point += translationOffset;
         points.push_back(point);
@@ -61,8 +63,11 @@ vector<glm::vec3> BilinearSurface::loadPointsFromTextFile(const string& filename
     return points;
 }
 
+//Denne funksjonen reduserer antall punkter i punktskyen. Den bruker hash funksjoenen til å 
+//organisere punktene i et rutenett og reduserer antall punkter slik at hver celle i rutenettet
+//inneholder et punkt 
 vector<glm::vec3> BilinearSurface::reducePoints(const vector<glm::vec3>& points, float cellSize) {
-    unordered_map<std::pair<int, int>, glm::vec3, pair_hash> grid;
+    unordered_map<pair<int, int>, glm::vec3, pair_hash> grid;
 
     for (const auto& point : points) {
         int xIdx = static_cast<int>(point.x / cellSize);
@@ -114,7 +119,13 @@ void BilinearSurface::drawControlPoints(const Shader& shader, const glm::mat4& p
     glBindVertexArray(0);
 }
 
-vector<glm::ivec3> BilinearSurface::delaunayTriangulation(vector<glm::vec3>& points) {
+//Utfører Delaunay trianguleringen på punktskyen, legger først til trkanten som omfavner alle punktene. 
+// Går gjennom hvert punkt og ser om punktene er innenfor en omskrevne sirkelen til en trelant, fjerner trekanter 
+// som ikke følger Delaunay egenskapen, bruker kantene fra trekantene til å lage nye trekanter. 
+// Tilslutt fjernes alle trekanter som bruker noen av punktene til den store trekanten. 
+//Referanse https://github.com/Maknee/Delaunay-Triangulation/tree/master/source
+vector<glm::ivec3> BilinearSurface::delaunayTriangulation(vector<glm::vec3>& points) 
+{
     vector<glm::ivec3> triangles;
     addSuperTriangle(points);
     int superTriangleStartIndex = points.size() - 3;
@@ -161,25 +172,51 @@ vector<glm::ivec3> BilinearSurface::delaunayTriangulation(vector<glm::vec3>& poi
             return tri.x >= superTriangleStartIndex || tri.y >= superTriangleStartIndex || tri.z >= superTriangleStartIndex;
         }),
         triangles.end());
+
     return triangles;
 }
 
-vector<BilinearSurface::VertexData> BilinearSurface::calculateVertices(const vector<glm::vec3>& points, const vector<glm::ivec3>& triangles) 
+//Ser etter om et punkt ligger innenfor den omskrevne sirkelen til en trekant. 
+//Bruker determinanter til å avgjøre om punktet ligger innenfor den omskrevne sirkelen. 
+bool BilinearSurface::inCircumcircle(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c, const glm::vec3& p)
+{
+    float ax = a.x - p.x, ay = a.y - p.y;
+    float bx = b.x - p.x, by = b.y - p.y;
+    float cx = c.x - p.x, cy = c.y - p.y;
+    float determinant =
+        (ax * ax + ay * ay) * (bx * cy - by * cx) -
+        (bx * bx + by * by) * (ax * cy - ay * cx) +
+        (cx * cx + cy * cy) * (ax * by - ay * bx);
+    return determinant > 0;
+}
+
+//Legger til en stor trekant hvor hele punktskyen er innenfor trekanten. 
+//Dette gjøres for at det ikke skal være noen annen kode f.eks andre punkter son kan forstyrre Delaunay trianguleringen 
+void BilinearSurface::addSuperTriangle(vector<glm::vec3>& points) {
+    float maxCoordinate = 50.0f;
+    points.push_back(glm::vec3(-maxCoordinate, -maxCoordinate, 0.0f));
+    points.push_back(glm::vec3(maxCoordinate, -maxCoordinate, 0.0f));
+    points.push_back(glm::vec3(0.0f, maxCoordinate, 0.0f));
+}
+
+//Referanse https://stackoverflow.com/questions/30120636/calculating-vertex-normals-in-opengl-with-c
+//Regner ut normalvektorer til punktene på den bilineære flaten. Disse brukes til lysetting for phong shaderen. 
+vector<BilinearSurface::VertexData> BilinearSurface::Normals(const vector<glm::vec3>& points, const vector<glm::ivec3>& triangles) 
 {
     vector<glm::vec3> normals(points.size(), glm::vec3(0.0f));
 
-    for (const auto& tri : triangles) {
-        glm::vec3 p0 = points[tri.x];
-        glm::vec3 p1 = points[tri.y];
-        glm::vec3 p2 = points[tri.z];
+    for (const auto& triangle : triangles) {
+        glm::vec3 p0 = points[triangle.x];
+        glm::vec3 p1 = points[triangle.y];
+        glm::vec3 p2 = points[triangle.z];
 
         glm::vec3 edge1 = p1 - p0;
         glm::vec3 edge2 = p2 - p0;
         glm::vec3 normal = glm::normalize(glm::cross(edge1, edge2));
 
-        normals[tri.x] += normal;
-        normals[tri.y] += normal;
-        normals[tri.z] += normal;
+        normals[triangle.x] += normal;
+        normals[triangle.y] += normal;
+        normals[triangle.z] += normal;
     }
 
     for (auto& normal : normals) {
@@ -194,31 +231,16 @@ vector<BilinearSurface::VertexData> BilinearSurface::calculateVertices(const vec
     return vertexData;
 }
 
-bool BilinearSurface::inCircumcircle(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c, const glm::vec3& p) {
-    float ax = a.x - p.x, ay = a.y - p.y;
-    float bx = b.x - p.x, by = b.y - p.y;
-    float cx = c.x - p.x, cy = c.y - p.y;
-    float det = (ax * ax + ay * ay) * (bx * cy - by * cx) -
-        (bx * bx + by * by) * (ax * cy - ay * cx) +
-        (cx * cx + cy * cy) * (ax * by - ay * bx);
-    return det > 0;
-}
-
-void BilinearSurface::addSuperTriangle(vector<glm::vec3>& points) {
-    float maxCoordinate = 50.0f;
-    points.push_back(glm::vec3(-maxCoordinate, -maxCoordinate, 0.0f));
-    points.push_back(glm::vec3(maxCoordinate, -maxCoordinate, 0.0f));
-    points.push_back(glm::vec3(0.0f, maxCoordinate, 0.0f));
-}
-
+//Ser på trekantene som blir generert av Delaunay trianguleringen. Senteret av trekantene blir kontrollpunktene for B-spline flaten 
 vector<glm::vec3> BilinearSurface::calculateControlPoints(const vector<glm::vec3>& points, const vector<glm::ivec3>& triangles) 
 {
     vector<glm::vec3> controlPoints;
 
-    for (const auto& tri : triangles) {
-        glm::vec3 p0 = points[tri.x];
-        glm::vec3 p1 = points[tri.y];
-        glm::vec3 p2 = points[tri.z];
+    for (const auto& triangle : triangles) 
+    {
+        glm::vec3 p0 = points[triangle.x];
+        glm::vec3 p1 = points[triangle.y];
+        glm::vec3 p2 = points[triangle.z];
 
         glm::vec3 midpoint01 = (p0 + p1) * 0.5f;
         glm::vec3 midpoint12 = (p1 + p2) * 0.5f;
@@ -238,6 +260,7 @@ vector<glm::vec3> BilinearSurface::calculateControlPoints(const vector<glm::vec3
     return controlPoints;
 }
 
+//Lager skjøtvektoren for B-spine flaten. Den lager jevnt stigende verdier (uniform skjøtvektor)
 vector<float> BilinearSurface::generateKnotVector(int numControlPoints) 
 {
     int m = numControlPoints - 1;
@@ -250,13 +273,17 @@ vector<float> BilinearSurface::generateKnotVector(int numControlPoints)
     return knotVector;
 }
 
+//Ser på B-spline overflaten i u og v retning ved et kontrollpunkt. 
+//Basisfuksjonene brukes til å bestemme hvor mye hvert kontrollpunkt påvirker overflaten. 
 glm::vec3 BilinearSurface::evaluateBSpline(float u, float v, const vector<glm::vec3>& controlPoints, const vector<float>& knotsU, const vector<float>& knotsV) 
 {
     int n = controlPoints.size();
     glm::vec3 result(0.0f);
 
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
+    for (int i = 0; i < n; ++i) 
+    {
+        for (int j = 0; j < n; ++j) 
+        {
             float Bu = basisFunction(i, 3, u, knotsU);
             float Bv = basisFunction(j, 3, v, knotsV);
             result += Bu * Bv * controlPoints[i * n + j];
@@ -266,6 +293,7 @@ glm::vec3 BilinearSurface::evaluateBSpline(float u, float v, const vector<glm::v
     return result;
 }
 
+//Basisfunksjonene for B-spline flaten 
 float BilinearSurface::basisFunction(int i, int k, float u, const vector<float>& knots) 
 {
     if (k == 1) 
@@ -273,14 +301,15 @@ float BilinearSurface::basisFunction(int i, int k, float u, const vector<float>&
         return (knots[i] <= u && u < knots[i + 1]) ? 1.0f : 0.0f;
     }
     else {
-        float coeff1 = (u - knots[i]) / (knots[i + k - 1] - knots[i]);
-        float coeff2 = (knots[i + k] - u) / (knots[i + k] - knots[i + 1]);
+        float coefficient1 = (u - knots[i]) / (knots[i + k - 1] - knots[i]);
+        float coefficient2 = (knots[i + k] - u) / (knots[i + k] - knots[i + 1]);
 
-        return coeff1 * basisFunction(i, k - 1, u, knots) + coeff2 * basisFunction(i + 1, k - 1, u, knots);
+        return coefficient1 * basisFunction(i, k - 1, u, knots) + coefficient2 * basisFunction(i + 1, k - 1, u, knots);
     }
 }
 
-void BilinearSurface::setupBuffers() {
+void BilinearSurface::setupBuffers() 
+{
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
     glGenBuffers(1, &EBO);
@@ -301,7 +330,8 @@ void BilinearSurface::setupBuffers() {
     glBindVertexArray(0);
 }
 
-void BilinearSurface::setupControlPointBuffers() {
+void BilinearSurface::setupControlPointBuffers() 
+{
     glGenVertexArrays(1, &VAOControlPoints);
     glGenBuffers(1, &VBOControlPoints);
 
@@ -317,7 +347,8 @@ void BilinearSurface::setupControlPointBuffers() {
     glBindVertexArray(0);
 }
 
-void BilinearSurface::setupPointBuffers() {
+void BilinearSurface::setupPointBuffers() 
+{
     glGenVertexArrays(1, &VAOPoints);
     glGenBuffers(1, &VBOPoints);
 
@@ -333,7 +364,8 @@ void BilinearSurface::setupPointBuffers() {
     glBindVertexArray(0);
 }
 
-void BilinearSurface::setupNormalBuffers() {
+void BilinearSurface::setupNormalBuffers() 
+{
     glGenVertexArrays(1, &VAONormals);
     glGenBuffers(1, &VBONormals);
 
@@ -348,10 +380,15 @@ void BilinearSurface::setupNormalBuffers() {
     glBindVertexArray(0);
 }
 
-void BilinearSurface::cleanup() {
+void BilinearSurface::cleanup() 
+{
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
     glDeleteBuffers(1, &EBO);
     glDeleteVertexArrays(1, &VAONormals);
     glDeleteBuffers(1, &VBONormals);
+    glDeleteVertexArrays(1, &VAOPoints);
+    glDeleteBuffers(1, &VBOPoints);
+    glDeleteVertexArrays(1, &VAOControlPoints);
+    glDeleteBuffers(1, &VBOControlPoints);
 }

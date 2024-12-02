@@ -34,7 +34,7 @@ const unsigned int SCR_WIDTH = 1600;
 const unsigned int SCR_HEIGHT = 1200;
 
 
-Camera camera(glm::vec3(2.13f, 11.7f, 0.2f));
+Camera camera(glm::vec3(2.13f, 11.7f, 0.4f));
 GLfloat lastX = SCR_WIDTH / 2.0f;
 GLfloat lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -51,7 +51,7 @@ float yMax = 11.76f;
 
 //Ballene beveger seg ikke når programmet starter og ballenes størrelse 
 bool ballsMoving = false;
-float ballRadius = 0.01f;
+float ballRadius = 0.005f;
 
 //Styring av tiden 
 float deltaTime = 0.0f;
@@ -141,7 +141,7 @@ int main()
     PhysicsCalculations physics(xMin, xMax, yMin, yMax, ballRadius);
 
     //Oppretter objekter for ballene med posisjon og hastighetsretning og bakgrunnsfage
-    vector<glm::vec3> ballPositions = { {2.04f, 11.76f, 0.01f}, {2.199f, 11.76f, 0.01f} };
+    vector<glm::vec3> ballPositions = { {2.04f, 11.76f, 0.05f}, {2.199f, 11.76f, 0.05f} };
     vector<glm::vec3> ballVelocities = { {0.3f, -0.1f, 0.0f}, {-0.3f, -0.1f, 0.0f} };
     vector<vector<glm::vec3>> ballTrack(ballPositions.size());
     vector<Ball> balls;
@@ -185,7 +185,7 @@ int main()
     textureShader.setInt("material.specular", 1);
 
     BilinearSurface bilinear;
-    bilinear.loadAndInitialize("32-2-517-155-12.txt", 0.0008f);
+    bilinear.loadFunctions("32-2-517-155-12.txt", 0.0008f);
 
 
   while (!glfwWindowShouldClose(window))
@@ -257,7 +257,7 @@ int main()
        textureShader.setMat4("projection", projection);
        textureShader.setMat4("view", view);
 
-       //Oppdaterer all fysikken 
+       ////Oppdaterer all fysikken 
        accumulator += deltaTime;
        while (accumulator >= fixedTimeStep)
        {
@@ -300,7 +300,7 @@ int main()
         ourShader.setMat4("view", view);
         ourShader.setMat4("model", model);
 
-        bilinear.drawNormals(ourShader, projection, view, model);
+        //bilinear.drawNormals(ourShader, projection, view, model);
 
         //bilinear.drawPoints(ourShader, projection, view, model);
 

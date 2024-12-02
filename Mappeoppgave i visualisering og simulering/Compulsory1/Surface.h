@@ -38,7 +38,7 @@ public:
     glm::vec3 calculatePartialDerivative(float u, float v, bool evaluateInUDirection) const;
 
     //For sporingen av ballene 
-    std::vector<glm::vec3> calculateBSplineCurve(const std::vector<glm::vec3>& controlPoints, int degree, int resolution) const;
+    std::vector<glm::vec3> calculateBSplineCurve(const vector<glm::vec3>& controlPoints, int degree, int resolution) const;
     void renderBSplineCurve(const vector<glm::vec3>& curvePoints, Shader& shader, glm::mat4& projection, glm::mat4& view) const;
 
 private:
