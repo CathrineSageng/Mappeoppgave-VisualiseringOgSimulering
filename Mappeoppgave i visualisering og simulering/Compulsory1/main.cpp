@@ -69,7 +69,6 @@ float frictionAreaYMax = 11.7f;
 float normalFriction = 0.01f;
 float highFriction = 0.5f;
 
-// Kontrollpunkter fra Kapittel 12.1- B-spline flater. 
 vector<glm::vec3> controlPoints =
 {
     glm::vec3(2.04f, 11.64f, 0.041f), glm::vec3(2.093f, 11.64f, 0.040f), glm::vec3(2.148f,11.64f, 0.037f), glm::vec3(2.199f,11.64f, 0.035f),

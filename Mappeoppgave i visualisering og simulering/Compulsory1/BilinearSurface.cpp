@@ -35,11 +35,13 @@ void BilinearSurface::loadFunctions(const string& filename, float reductionCellS
 }
 
 //Referanse https://www.geeksforgeeks.org/how-to-read-from-a-file-in-cpp/
-vector<glm::vec3> BilinearSurface::loadsPointsFromTextfile(const string& filename) {
+vector<glm::vec3> BilinearSurface::loadsPointsFromTextfile(const string& filename) 
+{
     ifstream inFile(filename);
     vector<glm::vec3> points;
 
-    if (!inFile.is_open()) {
+    if (!inFile.is_open()) 
+    {
         return points;
     }
 
@@ -69,7 +71,8 @@ vector<glm::vec3> BilinearSurface::loadsPointsFromTextfile(const string& filenam
 vector<glm::vec3> BilinearSurface::reducePoints(const vector<glm::vec3>& points, float cellSize) {
     unordered_map<pair<int, int>, glm::vec3, pair_hash> grid;
 
-    for (const auto& point : points) {
+    for (const auto& point : points) 
+    {
         int xIdx = static_cast<int>(point.x / cellSize);
         int yIdx = static_cast<int>(point.y / cellSize);
         std::pair<int, int> gridCell = { xIdx, yIdx };
@@ -192,7 +195,8 @@ bool BilinearSurface::inCircumcircle(const glm::vec3& a, const glm::vec3& b, con
 
 //Legger til en stor trekant hvor hele punktskyen er innenfor trekanten. 
 //Dette gjøres for at det ikke skal være noen annen kode f.eks andre punkter son kan forstyrre Delaunay trianguleringen 
-void BilinearSurface::addSuperTriangle(vector<glm::vec3>& points) {
+void BilinearSurface::addSuperTriangle(vector<glm::vec3>& points) 
+{
     float maxCoordinate = 50.0f;
     points.push_back(glm::vec3(-maxCoordinate, -maxCoordinate, 0.0f));
     points.push_back(glm::vec3(maxCoordinate, -maxCoordinate, 0.0f));
@@ -205,7 +209,8 @@ vector<BilinearSurface::VertexData> BilinearSurface::Normals(const vector<glm::v
 {
     vector<glm::vec3> normals(points.size(), glm::vec3(0.0f));
 
-    for (const auto& triangle : triangles) {
+    for (const auto& triangle : triangles) 
+    {
         glm::vec3 p0 = points[triangle.x];
         glm::vec3 p1 = points[triangle.y];
         glm::vec3 p2 = points[triangle.z];
@@ -219,12 +224,14 @@ vector<BilinearSurface::VertexData> BilinearSurface::Normals(const vector<glm::v
         normals[triangle.z] += normal;
     }
 
-    for (auto& normal : normals) {
+    for (auto& normal : normals) 
+    {
         normal = glm::normalize(normal);
     }
 
     vector<VertexData> vertexData;
-    for (size_t i = 0; i < points.size(); ++i) {
+    for (size_t i = 0; i < points.size(); ++i) 
+    {
         vertexData.push_back({ points[i], normals[i] });
     }
 

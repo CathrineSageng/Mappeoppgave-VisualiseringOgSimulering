@@ -77,7 +77,7 @@ void PhysicsCalculations::whenCollisionHappens(glm::vec3& p1, glm::vec3& v1, glm
         return;
 
     // Impulsberegning
-    float e = 1.0f; // Perfekt elastisk kollisjon
+    float e = 1.0f;
     float j = -(1 + e) * velocityAlongNormal / (1.0f / m1 + 1.0f / m2);
 
     glm::vec3 impulse = j * normal;
@@ -86,7 +86,7 @@ void PhysicsCalculations::whenCollisionHappens(glm::vec3& p1, glm::vec3& v1, glm
     v2 -= impulse / m2;
 
     // Begrens hastigheten for å unngå unødvendig akselerasjon
-    float maxSpeed = 2.0f; // Sett maks tillatt hastighet
+    float maxSpeed = 2.0f;
     v1 = glm::normalize(v1) * glm::min(glm::length(v1), maxSpeed);
     v2 = glm::normalize(v2) * glm::min(glm::length(v2), maxSpeed);
 }
@@ -103,14 +103,17 @@ void PhysicsCalculations::updatePhysics(vector<glm::vec3>& ballPositions, vector
 
     octree = Octree(glm::vec3(xMin, yMin, xMin), glm::vec3(xMax, yMax, xMax), 0, 4, 4);
 
-    for (int i = 0; i < ballPositions.size(); ++i) {
+    for (int i = 0; i < ballPositions.size(); ++i) 
+    {
         ballPositions[i] += ballVelocities[i] * timeStep;
 
-        if (ballPositions[i].x - ballRadius <= xMin || ballPositions[i].x + ballRadius >= xMax) {
+        if (ballPositions[i].x - ballRadius <= xMin || ballPositions[i].x + ballRadius >= xMax) 
+        {
             ballVelocities[i].x = -ballVelocities[i].x;
             ballPositions[i].x = glm::clamp(ballPositions[i].x, xMin + ballRadius, xMax - ballRadius);
         }
-        if (ballPositions[i].y - ballRadius <= yMin || ballPositions[i].y + ballRadius >= yMax) {
+        if (ballPositions[i].y - ballRadius <= yMin || ballPositions[i].y + ballRadius >= yMax) 
+        {
             ballVelocities[i].y = -ballVelocities[i].y;
             ballPositions[i].y = glm::clamp(ballPositions[i].y, yMin + ballRadius, yMax - ballRadius);
         }
@@ -120,7 +123,8 @@ void PhysicsCalculations::updatePhysics(vector<glm::vec3>& ballPositions, vector
         glm::vec3 surfacePoint = surface.calculateSurfacePoint(u, v);
         ballPositions[i].z = surfacePoint.z + ballRadius;
 
-        if (ballTrack[i].empty() || glm::distance(ballPositions[i], ballTrack[i].back()) > 0.01f) {
+        if (ballTrack[i].empty() || glm::distance(ballPositions[i], ballTrack[i].back()) > 0.01f) 
+        {
             ballTrack[i].push_back(ballPositions[i]);
         }
 

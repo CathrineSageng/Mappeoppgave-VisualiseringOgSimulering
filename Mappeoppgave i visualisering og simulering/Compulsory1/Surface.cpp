@@ -6,6 +6,9 @@ Surface::Surface(const vector<glm::vec3>& controlPoints, int widthU, int widthV,
     const vector<float>& knotU, const vector<float>& knotV)
     : controlPoints(controlPoints), widthU(widthU), widthV(widthV), knotU(knotU), knotV(knotV) {}
 
+//Referanse https://github.com/pascal754/BsplineSurface/blob/main/BsplineSurface/BsplineSurface.cpp
+// Referanse kapittel 12 https://drive.google.com/file/d/1iOIm-Orpi-zYynCo7TyEQccLohRI5HBh/view
+
 //Denne funsjonen regner ut B-spline basesfunksjonene. 
 //i= hvilke del av sjøtevektoren som påvirker basesfunksjonen d= er graden på basisfunksjonen, 
 // t = parameteren, knots er delen av skjøtevektoren som er aktiv. 
@@ -26,7 +29,6 @@ float Surface::BSplineBasisFunctions(int i, int d, float t, const vector<float>&
 //Denne funksjonen er viktig for utregning av normaler. 
 //Her ser man hvordan overflaten endrer seg lokalt ved å finne tangentvektoren til overflaten i u og v retning ved å kombinere basisfunksjoner og 
 //kontrollpunkter 
-//Bestemmer retningen av derivaten (true beregner derivaten med hensyn på u
 glm::vec3 Surface::calculatePartialDerivative(float u, float v, bool evaluateInUDirection) const
 {
     glm::vec3 derivative(0.0f);
@@ -35,10 +37,13 @@ glm::vec3 Surface::calculatePartialDerivative(float u, float v, bool evaluateInU
     float scaledV = v * (knotV[knotV.size() - degreeV - 1] - knotV.front()) + knotV.front();
 
     //Går gjennom alle kontrollpunktene. 
-    for (int i = 0; i < widthU; ++i) {
-        for (int j = 0; j < widthV; ++j) {
+    for (int i = 0; i < widthU; ++i) 
+    {
+        for (int j = 0; j < widthV; ++j) 
+        {
             int index = j * widthU + i;
-            if (index < controlPoints.size()) {
+            if (index < controlPoints.size()) 
+            {
                 float basisU = evaluateInUDirection ? BSplineBasisFunctions(i, degreeU - 1, scaledU, knotU) : BSplineBasisFunctions(i, degreeU, scaledU, knotU);
                 float basisV = evaluateInUDirection ? BSplineBasisFunctions(j, degreeV, scaledV, knotV) : BSplineBasisFunctions(j, degreeV - 1, scaledV, knotV);
                 derivative += basisU * basisV * controlPoints[index];
@@ -144,7 +149,8 @@ vector<unsigned int> Surface::generateIndices(int pointsOnTheSurface) const
     return indices;
 }
 
-std::vector<glm::vec3> Surface::calculateBSplineCurve(const std::vector<glm::vec3>& controlPoints, int degree, int resolution) const {
+std::vector<glm::vec3> Surface::calculateBSplineCurve(const std::vector<glm::vec3>& controlPoints, int degree, int resolution) const 
+{
     std::vector<glm::vec3> splinePoints;
 
     if (controlPoints.size() < degree + 1) {
@@ -153,28 +159,34 @@ std::vector<glm::vec3> Surface::calculateBSplineCurve(const std::vector<glm::vec
 
     // Fjern uønskede punkter som (0,0,0)
     std::vector<glm::vec3> validControlPoints;
-    for (const auto& point : controlPoints) {
-        if (point != glm::vec3(0.0f, 0.0f, 0.0f)) {
+    for (const auto& point : controlPoints) 
+    {
+        if (point != glm::vec3(0.0f, 0.0f, 0.0f)) 
+        {
             validControlPoints.push_back(point);
         }
     }
 
-    if (validControlPoints.size() < degree + 1) {
+    if (validControlPoints.size() < degree + 1) 
+    {
         return splinePoints; // Ikke nok gyldige punkter
     }
 
     // Fortsett som før med `validControlPoints` i stedet for `controlPoints`
     int knotCount = validControlPoints.size() + degree + 1;
     std::vector<float> knots(knotCount);
-    for (int i = 0; i < knotCount; ++i) {
+    for (int i = 0; i < knotCount; ++i) 
+    {
         knots[i] = i < degree + 1 ? 0.0f : (i > validControlPoints.size() ? 1.0f : (float)(i - degree) / (validControlPoints.size() - degree));
     }
 
-    for (int step = 0; step <= resolution; ++step) {
+    for (int step = 0; step <= resolution; ++step) 
+    {
         float t = step / static_cast<float>(resolution);
 
         glm::vec3 point(0.0f);
-        for (int i = 0; i < validControlPoints.size(); ++i) {
+        for (int i = 0; i < validControlPoints.size(); ++i) 
+        {
             float basis = BSplineBasisFunctions(i, degree, t, knots);
             point += basis * validControlPoints[i];
         }
@@ -246,7 +258,8 @@ void Surface::setupBuffers(unsigned int& surfaceVAO, unsigned int& surfaceVBO, u
     // Generer farger for friksjonsområdet
     for (const glm::vec3& point : surfacePoints) {
         if (point.x >= frictionAreaXMin && point.x <= frictionAreaXMax &&
-            point.y >= frictionAreaYMin && point.y <= frictionAreaYMax) {
+            point.y >= frictionAreaYMin && point.y <= frictionAreaYMax) 
+        {
             // Sett friksjonsområdet til rød farge
             colors.push_back(glm::vec3(1.0f, 0.0f, 0.0f));
         }
@@ -290,7 +303,8 @@ void Surface::setupBuffers(unsigned int& surfaceVAO, unsigned int& surfaceVBO, u
 
     vector<glm::vec3> normalLines;
     float normalLength = 0.05f;
-    for (int i = 0; i < surfacePoints.size(); ++i) {
+    for (int i = 0; i < surfacePoints.size(); ++i) 
+    {
         glm::vec3 startPoint = surfacePoints[i];
         glm::vec3 endPoint = startPoint + normals[i] * normalLength;
         normalLines.push_back(startPoint);

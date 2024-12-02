@@ -46,18 +46,21 @@ Ball::Ball(float radius, int sectors, int stacks, glm::vec3 color) :ballRadius(r
         }
     }
 
-    for (int i = 0; i < stacks; ++i) {
+    for (int i = 0; i < stacks; ++i) 
+    {
         int k1 = i * (sectors + 1);
         int k2 = k1 + sectors + 1;
 
-        for (int j = 0; j < sectors; ++j, ++k1, ++k2) {
+        for (int j = 0; j < sectors; ++j, ++k1, ++k2) 
+        {
             if (i != 0) {
                 indices.push_back(k1);
                 indices.push_back(k2);
                 indices.push_back(k1 + 1);
             }
 
-            if (i != (stacks - 1)) {
+            if (i != (stacks - 1)) 
+            {
                 indices.push_back(k1 + 1);
                 indices.push_back(k2);
                 indices.push_back(k2 + 1);
@@ -74,7 +77,8 @@ Ball::Ball(float radius, int sectors, int stacks, glm::vec3 color) :ballRadius(r
 
     // Combine vertices, colors, and texture coordinates in a single buffer (interleaved)
     std::vector<float> interleavedData;
-    for (size_t i = 0; i < vertices.size() / 3; ++i) {
+    for (size_t i = 0; i < vertices.size() / 3; ++i) 
+    {
         interleavedData.push_back(vertices[3 * i]);      // x
         interleavedData.push_back(vertices[3 * i + 1]);  // y
         interleavedData.push_back(vertices[3 * i + 2]);  // z
