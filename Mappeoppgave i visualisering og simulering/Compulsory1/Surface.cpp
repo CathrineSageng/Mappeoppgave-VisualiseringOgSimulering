@@ -60,8 +60,8 @@ glm::vec3 Surface::calculateSurfacePoint(float u, float v) const
 {
     glm::vec3 point(0.0f);
     int degreeU = 2, degreeV = 2;
-    float scaledU = std::min(u * (knotU[knotU.size() - degreeU - 1] - knotU.front()) + knotU.front(), knotU[knotU.size() - degreeU - 1] - 0.001f);
-    float scaledV = std::min(v * (knotV[knotV.size() - degreeV - 1] - knotV.front()) + knotV.front(), knotV[knotV.size() - degreeV - 1] - 0.001f);
+    float scaledU = min(u * (knotU[knotU.size() - degreeU - 1] - knotU.front()) + knotU.front(), knotU[knotU.size() - degreeU - 1] - 0.001f);
+    float scaledV = min(v * (knotV[knotV.size() - degreeV - 1] - knotV.front()) + knotV.front(), knotV[knotV.size() - degreeV - 1] - 0.001f);
 
     for (int i = 0; i < widthU; ++i)
     {
@@ -149,16 +149,16 @@ vector<unsigned int> Surface::generateIndices(int pointsOnTheSurface) const
     return indices;
 }
 
-std::vector<glm::vec3> Surface::calculateBSplineCurve(const std::vector<glm::vec3>& controlPoints, int degree, int resolution) const 
+std::vector<glm::vec3> Surface::calculateBSplineCurve(const vector<glm::vec3>& controlPoints, int degree, int resolution) const 
 {
-    std::vector<glm::vec3> splinePoints;
+    vector<glm::vec3> splinePoints;
 
     if (controlPoints.size() < degree + 1) {
         return splinePoints; // Ikke nok punkter for B-spline
     }
 
     // Fjern uønskede punkter som (0,0,0)
-    std::vector<glm::vec3> validControlPoints;
+    vector<glm::vec3> validControlPoints;
     for (const auto& point : controlPoints) 
     {
         if (point != glm::vec3(0.0f, 0.0f, 0.0f)) 
@@ -174,7 +174,7 @@ std::vector<glm::vec3> Surface::calculateBSplineCurve(const std::vector<glm::vec
 
     // Fortsett som før med `validControlPoints` i stedet for `controlPoints`
     int knotCount = validControlPoints.size() + degree + 1;
-    std::vector<float> knots(knotCount);
+    vector<float> knots(knotCount);
     for (int i = 0; i < knotCount; ++i) 
     {
         knots[i] = i < degree + 1 ? 0.0f : (i > validControlPoints.size() ? 1.0f : (float)(i - degree) / (validControlPoints.size() - degree));
@@ -199,7 +199,7 @@ std::vector<glm::vec3> Surface::calculateBSplineCurve(const std::vector<glm::vec
 
 void Surface::renderBSplineCurve(const vector<glm::vec3>& curvePoints, Shader& shader, glm::mat4& projection, glm::mat4& view) const 
 {
-    static std::vector<float> permanentVertices;
+    static vector<float> permanentVertices;
     static glm::vec3 lastPoint(0.0f, 0.0f, 0.0f); 
     float pointSpacing = 0.001f;
 

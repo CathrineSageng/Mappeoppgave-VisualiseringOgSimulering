@@ -2,6 +2,7 @@
 #include <iostream>
 #include <glm/glm.hpp>
 
+//Referanse https://github.com/CathrineSageng/Spillmotorarkitektur-Compulsory_1/tree/main
 
 Octree::Octree(glm::vec3 minBounds, glm::vec3 maxBounds, int depth, int maxDepth, int maxObjects)
     : minBounds(minBounds), maxBounds(maxBounds), maxDepth(maxDepth), maxObjects(maxObjects)

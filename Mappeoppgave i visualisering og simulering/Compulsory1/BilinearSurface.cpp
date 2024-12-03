@@ -271,7 +271,7 @@ vector<glm::vec3> BilinearSurface::calculateControlPoints(const vector<glm::vec3
 vector<float> BilinearSurface::generateKnotVector(int numControlPoints) 
 {
     int m = numControlPoints - 1;
-    std::vector<float> knotVector;
+    vector<float> knotVector;
 
     for (int i = 0; i < 3; ++i) knotVector.push_back(0.0f);
     for (int i = 1; i < m - 1; ++i) knotVector.push_back(static_cast<float>(i));

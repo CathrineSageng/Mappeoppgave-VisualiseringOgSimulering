@@ -10,7 +10,7 @@
 #include<glm/gtc/matrix_transform.hpp>
 #include<glm/gtc/type_ptr.hpp>
 
-
+//referanse https://github.com/CathrineSageng/Spillmotorarkitektur-Compulsory_1/tree/main
 
 Ball::Ball(float radius, int sectors, int stacks, glm::vec3 color) :ballRadius(radius)
 {
@@ -18,12 +18,14 @@ Ball::Ball(float radius, int sectors, int stacks, glm::vec3 color) :ballRadius(r
     VBO = 0;
     EBO = 0;
 
-    for (int i = 0; i <= stacks; ++i) {
+    for (int i = 0; i <= stacks; ++i) 
+    {
         float stackAngle = M_PI / 2 - i * M_PI / stacks;
         float xy = radius * cosf(stackAngle);
         float z = radius * sinf(stackAngle);
 
-        for (int j = 0; j <= sectors; ++j) {
+        for (int j = 0; j <= sectors; ++j) 
+        {
             float sectorAngle = j * 2 * M_PI / sectors;
 
             float x = xy * cosf(sectorAngle);
